@@ -1,0 +1,87 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+
+    <Dialog title="IT Admin — Environment Comparison"
+            contentWidth="56rem" contentHeight="36rem"
+            draggable="true" resizable="true">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+
+                <!-- Controls -->
+                <HBox wrap="Wrap" alignItems="End" class="sapUiTinyMarginBottom">
+                    <VBox class="sapUiSmallMarginEnd">
+                        <Label text="Config"/>
+                        <Select id="cmpModule" width="14rem">
+                            <items>
+                                <core:Item key="MM"   text="MM Route Config"/>
+                                <core:Item key="MMSS" text="MM Safe Stock"/>
+                                <core:Item key="FI"   text="FI Limit Config"/>
+                                <core:Item key="SD"   text="SD Price Config"/>
+                            </items>
+                        </Select>
+                    </VBox>
+                    <VBox class="sapUiSmallMarginEnd">
+                        <Label text="Compare"/>
+                        <Select id="cmpEnv1" width="8rem" selectedKey="DEV">
+                            <items>
+                                <core:Item key="DEV" text="DEV"/>
+                                <core:Item key="QAS" text="QAS"/>
+                                <core:Item key="PRD" text="PRD"/>
+                            </items>
+                        </Select>
+                    </VBox>
+                    <VBox class="sapUiSmallMarginEnd">
+                        <Label text="vs"/>
+                        <Select id="cmpEnv2" width="8rem" selectedKey="QAS">
+                            <items>
+                                <core:Item key="DEV" text="DEV"/>
+                                <core:Item key="QAS" text="QAS"/>
+                                <core:Item key="PRD" text="PRD"/>
+                            </items>
+                        </Select>
+                    </VBox>
+                    <Button text="Compare" icon="sap-icon://compare" type="Emphasized"
+                            press=".onEnvCompareRun" class="sapUiTinyMarginBottom"/>
+                </HBox>
+
+                <core:HTML content="&lt;hr style='border:none;border-top:1px solid #e5e5e5;margin:0.25rem 0 0.5rem'/&gt;"/>
+
+                <!-- Result Table -->
+                <Table inset="false"
+                       noDataText="Select a config and two environments, then press Compare."
+                       items="{cmp>/rows}">
+                    <columns>
+                        <Column width="14rem"><Text text="Field"/></Column>
+                        <Column><Text text="{cmp>/env1Label}"/></Column>
+                        <Column><Text text="{cmp>/env2Label}"/></Column>
+                        <Column width="12rem"><Text text="Status"/></Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem>
+                            <cells>
+                                <Label text="{cmp>field}"/>
+                                <Text text="{cmp>val1}"/>
+                                <Text text="{cmp>val2}"/>
+                                <ObjectStatus
+                                    text="{cmp>status}"
+                                    state="{= ${cmp>status} === 'Same' ? 'Success' : 'Warning'}"/>
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+
+                <!-- Summary -->
+                <Text text="{cmp>/summary}" class="sapUiSmallMarginTop"/>
+
+            </VBox>
+        </content>
+
+        <buttons>
+            <Button text="Close" press=".onEnvCompareClose"/>
+        </buttons>
+
+    </Dialog>
+
+</core:FragmentDefinition>

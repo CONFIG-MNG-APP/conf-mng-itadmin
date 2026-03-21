@@ -1,0 +1,1 @@
+{"version":3,"file":"metadataProvider.js","sourceRoot":"","sources":["../../src/plugins/metadataProvider.ts"],"names":[],"mappings":";;AAEA,MAAqB,gBAAgB;IACjC,YAAoB,UAAuB;QAAvB,eAAU,GAAV,UAAU,CAAa;IAAG,CAAC;IAE/C,KAAK,CAAC,YAAY,CAAC,QAAgB;QAC/B,OAAO,IAAI,CAAC,UAAU,CAAC,QAAQ,CAAC,QAAQ,CAAC,CAAC;IAC9C,CAAC;IAED,WAAW,CAAC,QAAmB;QAC3B,aAAa;IACjB,CAAC;CACJ;AAVD,mCAUC"}

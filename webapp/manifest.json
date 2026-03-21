@@ -1,0 +1,86 @@
+{
+  "_version": "1.48.0",
+  "sap.app": {
+    "id": "zgsp26.conf.mng.itadmin",
+    "type": "application",
+    "i18n": "i18n/i18n.properties",
+    "applicationVersion": { "version": "0.0.1" },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "dataSources": {
+      "annotation": {
+        "type": "ODataAnnotation",
+        "uri": "annotations/annotation.xml",
+        "settings": { "localUri": "annotations/annotation.xml" }
+      },
+      "mainService": {
+        "uri": "/sap/opu/odata4/sap/zui_conf_req/srvd/sap/zsd_conf_req/0001/",
+        "type": "OData",
+        "settings": {
+          "annotations": ["annotation"],
+          "localUri": "localService/mainService/metadata.xml",
+          "odataVersion": "4.0"
+        }
+      }
+    },
+    "crossNavigation": {
+      "inbounds": {
+        "ITAdmin-manage": {
+          "semanticObject": "ITAdmin",
+          "action": "manage",
+          "title": "{{ITAdmin-manage.flpTitle}}",
+          "subTitle": "{{ITAdmin-manage.flpSubtitle}}",
+          "signature": { "parameters": {}, "additionalParameters": "allowed" }
+        }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "deviceTypes": { "desktop": true, "tablet": true, "phone": true }
+  },
+  "sap.ui5": {
+    "flexEnabled": false,
+    "dependencies": {
+      "minUI5Version": "1.108.33",
+      "libs": { "sap.m": {}, "sap.ui.core": {}, "sap.fe.core": {} }
+    },
+    "contentDensities": { "compact": true, "cozy": true },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": { "bundleName": "zgsp26.conf.mng.itadmin.i18n.i18n" }
+      },
+      "": {
+        "dataSource": "mainService",
+        "preload": true,
+        "settings": {
+          "synchronizationMode": "None",
+          "operationMode": "Server",
+          "autoExpandSelect": true,
+          "earlyRequests": true
+        }
+      }
+    },
+    "routing": {
+      "config": {},
+      "routes": [
+        { "name": "ITAdminMain", "pattern": ":?query:", "target": "ITAdminMain" }
+      ],
+      "targets": {
+        "ITAdminMain": {
+          "type": "Component",
+          "id": "ITAdminMain",
+          "name": "sap.fe.core.fpm",
+          "options": {
+            "settings": {
+              "contextPath": "/ZC_CONF_REQ_H",
+              "viewName": "zgsp26.conf.mng.itadmin.ext.main.Main"
+            }
+          }
+        }
+      }
+    }
+  },
+  "sap.fe": { "app": { "enableLazyLoading": true } }
+}

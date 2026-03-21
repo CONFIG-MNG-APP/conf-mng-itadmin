@@ -1,0 +1,80 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.parseSearch = exports.SearchParser = exports.SearchLexer = void 0;
+const chevrotain_1 = require("chevrotain");
+// ----------------- Lexer -----------------
+const OPEN = (0, chevrotain_1.createToken)({ name: 'OPEN', pattern: /(:?\(|%28)/ });
+const CLOSE = (0, chevrotain_1.createToken)({ name: 'CLOSE', pattern: /(:?\)|%29)/ });
+const QUOTE = (0, chevrotain_1.createToken)({ name: 'QUOTE', pattern: /(:?"|%22)/ });
+const STRINGLITERAL = (0, chevrotain_1.createToken)({
+    name: 'SimpleIdentifier',
+    pattern: /(:?[^\\"\s]+|\\(:?[bfnrtv"\\/]|u[0-9a-fA-F]{4}))+/
+});
+// null, boolean, guid, dateTimeInOffset / dateValue / timeOfDay / decimalValue / doubleValue / singleValue / string / duration / enum / binary
+const ANDOR = (0, chevrotain_1.createToken)({ name: 'AndOr', longer_alt: STRINGLITERAL, pattern: /(:?AND|OR)/ });
+const WS = (0, chevrotain_1.createToken)({ name: 'Whitespace', pattern: /\s+/ });
+const searchTokens = [OPEN, CLOSE, QUOTE, ANDOR, WS, STRINGLITERAL];
+exports.SearchLexer = new chevrotain_1.Lexer(searchTokens, {
+    // Less position info tracked, reduces verbosity of the playground output.
+    positionTracking: 'onlyStart'
+});
+/**
+ *
+ */
+class SearchParser extends chevrotain_1.EmbeddedActionsParser {
+    constructor() {
+        super(searchTokens, {
+            recoveryEnabled: true
+        });
+        this.searchExpression = this.RULE('searchExpression', () => {
+            return this.SUBRULE(this.expression);
+        });
+        this.expression = this.RULE('expression', () => {
+            let searchTerms = [];
+            const hasQuote = this.OPTION2(() => this.CONSUME(QUOTE));
+            if (hasQuote) {
+                // String literal including WS
+                let stringLit = '';
+                this.MANY_SEP({
+                    SEP: WS,
+                    DEF: () => {
+                        const stringToken = this.CONSUME(STRINGLITERAL);
+                        if (stringLit.length > 0) {
+                            stringLit += ' ';
+                        }
+                        stringLit += stringToken.image;
+                    }
+                });
+                searchTerms.push(stringLit);
+                this.CONSUME2(QUOTE);
+            }
+            else {
+                searchTerms.push(this.CONSUME(STRINGLITERAL).image);
+            }
+            this.OPTION3(() => {
+                this.CONSUME(WS);
+                const otherExpression = this.SUBRULE(this.expression);
+                searchTerms = searchTerms.concat(otherExpression);
+            });
+            return searchTerms;
+        });
+        this.performSelfAnalysis();
+    }
+}
+exports.SearchParser = SearchParser;
+function parseSearch(searchParameters) {
+    if (!searchParameters) {
+        return [];
+    }
+    const parser = new SearchParser();
+    const lexingResult = exports.SearchLexer.tokenize(searchParameters);
+    parser.input = lexingResult.tokens;
+    const output = parser.searchExpression();
+    if (parser.errors.length > 0) {
+        parser.errors.forEach(console.error);
+        throw new Error('Parsing errors detected');
+    }
+    return output;
+}
+exports.parseSearch = parseSearch;
+//# sourceMappingURL=searchParser.js.map

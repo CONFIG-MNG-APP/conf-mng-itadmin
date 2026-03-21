@@ -1,0 +1,11 @@
+{
+  "applications": {
+    "MMRouteAdmin-manage": {
+      "title": "MM Route Config",
+      "description": "IT Admin — Direct Maintenance",
+      "applicationType": "URL",
+      "url": "../",
+      "navigationMode": "embedded"
+    }
+  }
+}
