@@ -98,8 +98,11 @@
                                                ${Status} === 'ROLLED_BACK' ? 'Error'    : 'None'}"/>
                                 <Text text="{CreatedBy}"/>
                                 <Button
-                                    text="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Apply' : 'View'}"
-                                    type="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Emphasized' : 'Default'}"
+                                    text="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Apply' :
+                                              (${Status} === 'ACTIVE' &amp;&amp; ${EnvId} !== 'PRD') ? 'Promote' : 'View'}"
+                                    type="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Emphasized' :
+                                               (${Status} === 'ACTIVE' &amp;&amp; ${EnvId} !== 'PRD') ? 'Accept' : 'Default'}"
+                                    icon="{= (${Status} === 'ACTIVE' &amp;&amp; ${EnvId} !== 'PRD') ? 'sap-icon://journey-arrive' : ''}"
                                     press=".onActionPress"/>
                             </cells>
                         </ColumnListItem>

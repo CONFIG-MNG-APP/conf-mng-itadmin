@@ -5,7 +5,9 @@
     xmlns:l="sap.ui.layout">
 
     <Dialog id="detailDialog"
-            title="{= ${detail>/isApplyMode} ? 'Apply Configuration — REQ_ID: ' + ${detail>/reqId} : 'View Configuration — REQ_ID: ' + ${detail>/reqId} }"
+            title="{= ${detail>/isApplyMode} ? 'Apply Configuration — REQ_ID: ' + ${detail>/reqId} :
+                       ${detail>/isPromoteMode} ? 'Promote Configuration — REQ_ID: ' + ${detail>/reqId} :
+                       'View Configuration — REQ_ID: ' + ${detail>/reqId} }"
             contentWidth="60rem" contentHeight="44rem"
             verticalScrolling="false" draggable="true" resizable="true">
 
@@ -72,7 +74,7 @@
                 <Panel id="editablePanel"
                        headerText="IT Admin có thể sửa trực tiếp trước khi Apply"
                        expandable="true" expanded="true"
-                       visible="{detail>/isApplyMode}"
+                       visible="{= ${detail>/isApplyMode} &amp;&amp; !${detail>/isPromoteMode}}"
                        class="sapUiTinyMarginBottom">
                     <VBox>
                         <MessageStrip
@@ -106,17 +108,17 @@
         <buttons>
             <!-- Apply: lưu data vào bảng chính qua PATCH -->
             <Button id="dlgApplyBtn"
-                    text="Apply (Lưu vào bảng chính)"
+                    text="Apply"
                     icon="sap-icon://save"
                     type="Emphasized"
                     visible="{detail>/isApplyMode}"
                     press=".onDialogApply"/>
-            <!-- Promote: chuyển môi trường DEV→QAS→PRD -->
+            <!-- Promote: chuyển môi trường lên tầng cao hơn -->
             <Button id="dlgPromoteBtn"
-                    text="Promote to {detail>/nextEnv}"
+                    text="{= ${detail>/nextEnv} !== '—' ? 'Promote ' : 'Promote'}"
                     icon="sap-icon://journey-arrive"
                     type="Accept"
-                    visible="{= ${detail>/isApplyMode} &amp;&amp; ${detail>/nextEnv} !== '—'}"
+                    visible="{= ${detail>/isApplyMode} || ${detail>/isPromoteMode}}"
                     press=".onDialogPromote"/>
             <Button text="{= ${detail>/isApplyMode} ? 'Cancel' : 'Close'}"
                     press=".onDialogClose"/>

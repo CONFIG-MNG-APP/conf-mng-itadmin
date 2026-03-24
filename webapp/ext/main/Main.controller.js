@@ -124,14 +124,16 @@ sap.ui.define(
         const oCtx  = oItem.getBindingContext();
         this._oCurrentCtx = oCtx;
 
-        const sStatus  = oCtx.getProperty("Status");
-        const bIsApply = sStatus === "APPROVED" || sStatus === "A";
-        this._openDetailDialog(oCtx, bIsApply);
+        const sStatus     = oCtx.getProperty("Status");
+        const sEnvId      = oCtx.getProperty("EnvId") || "DEV";
+        const bIsApply    = sStatus === "APPROVED" || sStatus === "A";
+        const bIsPromote  = sStatus === "ACTIVE" && sEnvId !== "PRD";
+        this._openDetailDialog(oCtx, bIsApply, bIsPromote);
       },
 
       // ─── Open dialog ──────────────────────────────────────────────────────
 
-      _openDetailDialog: async function (oCtx, bIsApply) {
+      _openDetailDialog: async function (oCtx, bIsApply, bIsPromote) {
         const sReqId   = oCtx.getProperty("ReqId");
         const sModule  = oCtx.getProperty("ModuleId");
         const sTitle   = oCtx.getProperty("ReqTitle") || "-";
@@ -149,7 +151,7 @@ sap.ui.define(
           this._oDetailDialog.setModel(
             new JSONModel({
               reqId: "", module: "", confName: "", by: "", reason: "",
-              nextEnv: "", isApplyMode: true,
+              nextEnv: "", isApplyMode: true, isPromoteMode: false,
               lines: [], editableLines: [],
             }),
             "detail"
@@ -165,6 +167,7 @@ sap.ui.define(
           reqId: sReqId, module: sModule, confName: sTitle,
           by: sBy, reason: sReason, nextEnv: sNextEnv,
           isApplyMode: bIsApply,
+          isPromoteMode: !!bIsPromote,
           lines: [], editableLines: [],
         });
 
@@ -304,11 +307,12 @@ sap.ui.define(
               const oView = this.getView();
               oView.setBusy(true);
               try {
-                await this._promoteConfigItems(sReqId, sModule, sCurEnv, sNextEnv);
+                await this._oCurrentCtx.getModel().bindContext(
+                  "com.sap.gateway.srvd.zsd_conf_req.v0001.promote(...)",
+                  this._oCurrentCtx
+                ).execute("$auto");
                 this.byId("requestTable").getBinding("items").refresh();
-                MessageBox.success(
-                  "Đã promote thành công lên " + sNextEnv + "."
-                );
+                MessageBox.success("Đã promote thành công lên " + sNextEnv + ".");
               } catch (e) {
                 console.error(e);
                 MessageBox.error("Promote thất bại: " + (e.message || e));
@@ -318,88 +322,6 @@ sap.ui.define(
             },
           }
         );
-      },
-
-      // ─── Promote: fetch items → POST dòng mới với EnvId = nextEnv ─────────
-
-      _promoteConfigItems: async function (sReqId, sModule, sCurEnv, sNextEnv) {
-        const oSvc = _SERVICES[sModule] || this._oCurrentSvc;
-        if (!oSvc) throw new Error("Không tìm thấy service cho module: " + sModule);
-
-        // 1. Fetch config items của request hiện tại
-        const sFilterUrl = oSvc.url +
-          "?$filter=ReqId eq " + sReqId +
-          " and EnvId eq '" + sCurEnv + "'";
-
-        const oFetchResp = await fetch(sFilterUrl, {
-          headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        });
-        if (!oFetchResp.ok) {
-          throw new Error("Lấy config items thất bại (" + oFetchResp.status + ")");
-        }
-        const oData  = await oFetchResp.json();
-        const aItems = oData.value || [];
-
-        if (!aItems.length) {
-          throw new Error("Không có config item nào cho " + sCurEnv + " - ReqId: " + sReqId);
-        }
-
-        // 2. Fetch CSRF token
-        const sCsrf = await this._fetchCsrfToken(oSvc.url);
-
-        // 3. POST từng dòng mới, chỉ giữ business fields, đổi EnvId = nextEnv
-        const _SYSTEM_FIELDS = new Set([
-          "ItemId", "IsActiveEntity", "HasDraftEntity", "HasActiveEntity",
-          "DraftEntityCreationDateTime", "DraftEntityLastChangeDateTime",
-          "CreatedBy", "CreatedAt", "ChangedBy", "ChangedAt",
-          "__EntityControl", "__OperationControl", "SAP__Messages",
-        ]);
-
-        for (const oItem of aItems) {
-          const oNewItem = {};
-          Object.keys(oItem).forEach(function (k) {
-            if (!_SYSTEM_FIELDS.has(k) && typeof oItem[k] !== "object") {
-              oNewItem[k] = oItem[k];
-            }
-          });
-          oNewItem.EnvId = sNextEnv;   // đổi sang môi trường mới
-
-          const oPostResp = await fetch(oSvc.url, {
-            method: "POST",
-            headers: {
-              "Content-Type":     "application/json",
-              "Accept":           "application/json",
-              "X-CSRF-Token":     sCsrf,
-              "X-Requested-With": "XMLHttpRequest",
-            },
-            body: JSON.stringify(oNewItem),
-          });
-
-          if (!oPostResp.ok) {
-            const sErr = await oPostResp.text().catch(function () { return ""; });
-            throw new Error(
-              "POST thất bại (" + oPostResp.status + ")" +
-              (sErr ? ": " + sErr.substring(0, 200) : "")
-            );
-          }
-        }
-      },
-
-      // ─── CSRF token helper ────────────────────────────────────────────────
-
-      _fetchCsrfToken: async function (sServiceUrl) {
-        const oResp = await fetch(sServiceUrl, {
-          method: "HEAD",
-          headers: {
-            "X-CSRF-Token":     "Fetch",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        });
-        const sToken = oResp.headers.get("X-CSRF-Token");
-        if (!sToken || sToken === "Required") {
-          throw new Error("Không lấy được CSRF token");
-        }
-        return sToken;
       },
 
       // ─── Dialog: Close ────────────────────────────────────────────────────
