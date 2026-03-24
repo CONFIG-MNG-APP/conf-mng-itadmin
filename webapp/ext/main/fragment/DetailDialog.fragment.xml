@@ -1,147 +1,125 @@
 <core:FragmentDefinition
     xmlns="sap.m"
     xmlns:core="sap.ui.core"
-    xmlns:f="sap.ui.layout.form">
+    xmlns:f="sap.ui.layout.form"
+    xmlns:l="sap.ui.layout">
 
-    <Dialog id="detailDialog" title="{detail>/title}"
-            contentWidth="64rem" contentHeight="42rem"
+    <Dialog id="detailDialog"
+            title="{= ${detail>/isApplyMode} ? 'Apply Configuration — REQ_ID: ' + ${detail>/reqId} : 'View Configuration — REQ_ID: ' + ${detail>/reqId} }"
+            contentWidth="60rem" contentHeight="44rem"
             verticalScrolling="false" draggable="true" resizable="true">
 
         <content>
             <VBox class="sapUiSmallMargin">
 
                 <!-- Request Info -->
-                <f:SimpleForm layout="ResponsiveGridLayout"
-                              labelSpanL="4" labelSpanM="4" labelSpanS="12"
-                              columnsL="3" columnsM="2"
-                              class="sapUiTinyMarginBottom">
-                    <f:content>
-                        <Label text="Request ID"/>   <Text id="dlgReqId"      text=""/>
-                        <Label text="Status"/>        <ObjectStatus id="dlgStatus" text="" state="None"/>
-                        <Label text="Approved By"/>   <Text id="dlgApprovedBy" text=""/>
-                        <Label text="Current Env"/>   <ObjectStatus id="dlgCurEnv" text="" state="None"/>
-                        <Label text="Next Env"/>      <ObjectStatus id="dlgNextEnv" text="" state="None"/>
-                        <Label text="Approved At"/>   <Text id="dlgApprovedAt" text=""/>
-                    </f:content>
-                </f:SimpleForm>
+                <Panel headerText="Request Info" expandable="false" class="sapUiTinyMarginBottom">
+                    <HBox wrap="Wrap" class="sapUiSmallMargin" alignItems="Start">
+                        <VBox class="sapUiSmallMarginEnd" width="14rem">
+                            <Label text="Module" design="Bold"/>
+                            <Text text="{detail>/module}"/>
+                        </VBox>
+                        <VBox class="sapUiSmallMarginEnd" width="18rem">
+                            <Label text="Config" design="Bold"/>
+                            <Text text="{detail>/confName}"/>
+                        </VBox>
+                        <VBox class="sapUiSmallMarginEnd" width="10rem">
+                            <Label text="By" design="Bold"/>
+                            <Text text="{detail>/by}"/>
+                        </VBox>
+                        <VBox width="auto">
+                            <Label text="Reason" design="Bold"/>
+                            <Text text="{detail>/reason}" wrapping="true" width="16rem"/>
+                        </VBox>
+                    </HBox>
+                </Panel>
 
-                <core:HTML content="&lt;hr style='border:none;border-top:1px solid #e5e5e5;margin:0.25rem 0 0.5rem'/&gt;"/>
+                <!-- Preview thay đổi -->
+                <Panel headerText="Preview thay đổi" expandable="false" class="sapUiTinyMarginBottom">
+                    <Table id="previewTable" inset="false"
+                           noDataText="Loading..."
+                           items="{detail>/lines}">
+                        <columns>
+                            <Column width="10rem"><Text text="Field"/></Column>
+                            <Column><Text text="Giá trị cũ"/></Column>
+                            <Column><Text text="Giá trị mới"/></Column>
+                            <Column width="9rem" hAlign="Center"><Text text="Thay đổi"/></Column>
+                        </columns>
+                        <items>
+                            <ColumnListItem>
+                                <cells>
+                                    <Text text="{detail>field}"/>
+                                    <Text text="{detail>oldVal}"/>
+                                    <Text text="{detail>newVal}"/>
+                                    <HBox alignItems="Center" justifyContent="Center">
+                                        <core:Icon
+                                            src="sap-icon://arrow-left"
+                                            color="{= ${detail>changed} ? '#BB0000' : 'Default'}"
+                                            visible="{detail>changed}"
+                                            size="0.75rem"
+                                            class="sapUiTinyMarginEnd"/>
+                                        <Text
+                                            text="{= ${detail>changed} ? 'changed' : 'no change'}"
+                                            class="{= ${detail>changed} ? 'sapThemeNegativeText' : ''}"/>
+                                    </HBox>
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+                </Panel>
 
-                <!-- Tabs -->
-                <IconTabBar id="detailTabs" class="sapUiTinyMarginTop" stretchContentHeight="true">
-
-                    <!-- Tab 1: Preview Changes -->
-                    <items>
-                        <IconTabFilter text="Preview Changes" icon="sap-icon://detail-view" key="preview">
-                            <Table id="previewTable" inset="false"
-                                   noDataText="Loading..."
-                                   items="{detail>/lines}">
-                                <columns>
-                                    <Column width="12rem"><Text text="Field"/></Column>
-                                    <Column width="7rem"><Text text="Action"/></Column>
-                                    <Column><Text id="colSourceHeader" text="Source (DEV)"/></Column>
-                                    <Column><Text id="colTargetHeader" text="Target (QAS)"/></Column>
-                                </columns>
-                                <items>
-                                    <ColumnListItem>
-                                        <cells>
-                                            <Label text="{detail>field}"/>
-                                            <ObjectStatus text="{detail>action}"
-                                                state="{= ${detail>action} === 'DELETE' ? 'Error' :
-                                                           ${detail>action} === 'CREATE' ? 'Success' : 'Warning'}"/>
-                                            <HBox alignItems="Center">
-                                                <Text text="{detail>sourceVal}"/>
-                                                <core:Icon src="sap-icon://circle-task-2" color="Positive" size="0.6rem"
-                                                           visible="{detail>changed}"
-                                                           class="sapUiTinyMarginBegin"/>
-                                            </HBox>
-                                            <Text text="{= ${detail>changed}
-                                                            ? ${detail>targetVal} + ' (old)'
-                                                            : ${detail>targetVal} + ' (same)' }"/>
-                                        </cells>
-                                    </ColumnListItem>
-                                </items>
-                            </Table>
-                        </IconTabFilter>
-
-                        <!-- Tab 2: Rollback Preview -->
-                        <IconTabFilter text="Rollback Preview" icon="sap-icon://reset" key="rollback">
-                            <VBox class="sapUiTinyMarginTop">
-                                <MessageStrip
-                                    text="If you rollback, the following values will be RESTORED (overwriting current values)."
-                                    type="Warning"
-                                    showIcon="true"
-                                    showCloseButton="false"
-                                    class="sapUiTinyMarginBottom"/>
-                                <Table inset="false"
-                                       noDataText="Open a request row to load preview."
-                                       items="{detail>/lines}">
-                                    <columns>
-                                        <Column width="14rem"><Text text="Field"/></Column>
-                                        <Column><Text text="Current Value (will be lost)"/></Column>
-                                        <Column><Text text="Restored To (snapshot)"/></Column>
-                                        <Column width="8rem"><Text text="Changed?"/></Column>
-                                    </columns>
-                                    <items>
-                                        <ColumnListItem>
-                                            <cells>
-                                                <Label text="{detail>field}"/>
-                                                <Text text="{detail>sourceVal}"/>
-                                                <ObjectStatus
-                                                    text="{detail>targetVal}"
-                                                    state="{= ${detail>changed} ? 'Warning' : 'None'}"/>
-                                                <ObjectStatus
-                                                    text="{= ${detail>changed} ? 'Yes' : 'Same'}"
-                                                    state="{= ${detail>changed} ? 'Warning' : 'Success'}"/>
-                                            </cells>
-                                        </ColumnListItem>
-                                    </items>
-                                </Table>
-                            </VBox>
-                        </IconTabFilter>
-
-                        <!-- Tab 3: Audit Trail -->
-                        <IconTabFilter text="Audit Trail" icon="sap-icon://history" key="audit">
-                            <Table id="auditTable" inset="false"
-                                   noDataText="Loading audit trail..."
-                                   items="{detail>/auditLines}">
-                                <columns>
-                                    <Column width="10rem"><Text text="Action"/></Column>
-                                    <Column width="14rem"><Text text="User"/></Column>
-                                    <Column width="16rem"><Text text="Date"/></Column>
-                                    <Column width="8rem"><Text text="Env"/></Column>
-                                </columns>
-                                <items>
-                                    <ColumnListItem>
-                                        <cells>
-                                            <ObjectStatus text="{detail>Action}"
-                                                state="{= ${detail>Action} === 'APPROVE' ? 'Success' :
-                                                           ${detail>Action} === 'SUBMIT'  ? 'Warning' :
-                                                           ${detail>Action} === 'PROMOTE' ? 'Indication04' :
-                                                           ${detail>Action} === 'REJECT'  ? 'Error' : 'None'}"/>
-                                            <Text text="{detail>ChangedBy}"/>
-                                            <Text text="{detail>ChangedAt}"/>
-                                            <Text text="{detail>EnvId}"/>
-                                        </cells>
-                                    </ColumnListItem>
-                                </items>
-                            </Table>
-                        </IconTabFilter>
-
-                    </items>
-                </IconTabBar>
+                <!-- Editable table (IT Admin có thể sửa trước khi Apply) -->
+                <Panel id="editablePanel"
+                       headerText="IT Admin có thể sửa trực tiếp trước khi Apply"
+                       expandable="true" expanded="true"
+                       visible="{detail>/isApplyMode}"
+                       class="sapUiTinyMarginBottom">
+                    <VBox>
+                        <MessageStrip
+                            text="Chỉ hiển thị các dòng có thay đổi. Bạn có thể chỉnh sửa giá trị mới trước khi Apply."
+                            type="Information" showIcon="true" showCloseButton="false"
+                            class="sapUiTinyMarginBottom sapUiTinyMargin"/>
+                        <Table id="editableTable" inset="false"
+                               noDataText="Không có thay đổi nào."
+                               items="{detail>/editableLines}">
+                            <columns>
+                                <Column width="10rem"><Text text="Field"/></Column>
+                                <Column><Text text="Giá trị cũ"/></Column>
+                                <Column><Text text="Giá trị mới (có thể sửa)"/></Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem>
+                                    <cells>
+                                        <Text text="{detail>field}"/>
+                                        <Text text="{detail>oldVal}"/>
+                                        <Input value="{detail>newVal}" width="100%"/>
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </VBox>
+                </Panel>
 
             </VBox>
         </content>
 
         <buttons>
-            <Button id="dlgPromoteBtn" text="Promote to {detail>/nextEnv}"
-                    icon="sap-icon://accept" type="Emphasized"
+            <!-- Apply: lưu data vào bảng chính qua PATCH -->
+            <Button id="dlgApplyBtn"
+                    text="Apply (Lưu vào bảng chính)"
+                    icon="sap-icon://save"
+                    type="Emphasized"
+                    visible="{detail>/isApplyMode}"
+                    press=".onDialogApply"/>
+            <!-- Promote: chuyển môi trường DEV→QAS→PRD -->
+            <Button id="dlgPromoteBtn"
+                    text="Promote to {detail>/nextEnv}"
+                    icon="sap-icon://journey-arrive"
+                    type="Accept"
+                    visible="{= ${detail>/isApplyMode} &amp;&amp; ${detail>/nextEnv} !== '—'}"
                     press=".onDialogPromote"/>
-            <Button id="dlgRollbackBtn" text="Rollback"
-                    icon="sap-icon://undo" type="Reject"
-                    press=".onDialogRollback"/>
-            <Button text="Close" press=".onDialogClose"/>
+            <Button text="{= ${detail>/isApplyMode} ? 'Cancel' : 'Close'}"
+                    press=".onDialogClose"/>
         </buttons>
 
     </Dialog>

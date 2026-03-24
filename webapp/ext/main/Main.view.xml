@@ -4,118 +4,103 @@
     xmlns="sap.m"
     xmlns:core="sap.ui.core">
 
-    <Page id="mainPage" title="IT Admin — Configuration Request Management">
+    <Page id="mainPage" title="IT Admin — Configuration Management" showHeader="true">
         <content>
             <VBox class="sapUiSmallMargin">
 
                 <!-- Filter Bar -->
-                <Panel expandable="true" expanded="true" headerText="Filter"
-                       class="sapUiTinyMarginBottom sapUiContentPadding">
-                    <HBox wrap="Wrap" class="sapUiTinyMarginTop">
+                <HBox wrap="Wrap" alignItems="End" class="sapUiTinyMarginBottom sapUiSmallMarginTop">
 
-                        <VBox class="sapUiSmallMarginEnd">
-                            <Label text="Status"/>
-                            <Select id="statusFilter" width="12rem" selectedKey="APPROVED" change=".onFilter">
-                                <items>
-                                    <core:Item key=""         text="All"/>
-                                    <core:Item key="APPROVED" text="Approved"/>
-                                    <core:Item key="ACTIVE"   text="Active"/>
-                                </items>
-                            </Select>
-                        </VBox>
+                    <VBox class="sapUiSmallMarginEnd">
+                        <Label text="Module"/>
+                        <Select id="moduleFilter" width="10rem" selectedKey="" change=".onFilter">
+                            <items>
+                                <core:Item key=""   text="All Modules"/>
+                                <core:Item key="MM" text="MM"/>
+                                <core:Item key="FI" text="FI"/>
+                                <core:Item key="SD" text="SD"/>
+                            </items>
+                        </Select>
+                    </VBox>
 
-                        <VBox class="sapUiSmallMarginEnd">
-                            <Label text="Module"/>
-                            <Select id="moduleFilter" width="12rem" selectedKey="" change=".onFilter">
-                                <items>
-                                    <core:Item key=""   text="All Modules"/>
-                                    <core:Item key="MM" text="MM"/>
-                                    <core:Item key="FI" text="FI"/>
-                                    <core:Item key="SD" text="SD"/>
-                                </items>
-                            </Select>
-                        </VBox>
+                    <VBox class="sapUiSmallMarginEnd">
+                        <Label text="ENV"/>
+                        <Select id="envFilter" width="9rem" selectedKey="" change=".onFilter">
+                            <items>
+                                <core:Item key=""    text="All"/>
+                                <core:Item key="DEV" text="DEV"/>
+                                <core:Item key="QAS" text="QAS"/>
+                                <core:Item key="PRD" text="PRD"/>
+                            </items>
+                        </Select>
+                    </VBox>
 
-                        <VBox class="sapUiSmallMarginEnd">
-                            <Label text="Current Env"/>
-                            <Select id="envFilter" width="10rem" selectedKey="" change=".onFilter">
-                                <items>
-                                    <core:Item key=""    text="All"/>
-                                    <core:Item key="DEV" text="DEV"/>
-                                    <core:Item key="QAS" text="QAS"/>
-                                    <core:Item key="PRD" text="PRD"/>
-                                </items>
-                            </Select>
-                        </VBox>
+                    <VBox class="sapUiSmallMarginEnd">
+                        <Label text="Date Range"/>
+                        <DateRangeSelection id="dateFilter" width="16rem" change=".onFilter"/>
+                    </VBox>
 
-                        <VBox class="sapUiSmallMarginEnd" justifyContent="End">
-                            <Label text="&#160;"/>
-                            <Button text="Clear" press=".onClearFilter"/>
-                        </VBox>
+                    <VBox class="sapUiSmallMarginEnd">
+                        <Label text="Search"/>
+                        <SearchField id="searchField" width="14rem" search=".onSearch"/>
+                    </VBox>
 
-                    </HBox>
-                </Panel>
+                    <VBox justifyContent="End">
+                        <Label text="&#160;"/>
+                        <Button text="Clear" press=".onClearFilter"/>
+                    </VBox>
 
-                <!-- Toolbar -->
-                <OverflowToolbar class="sapUiTinyMarginBottom">
-                    <Title text="Promote &amp; Rollback Dashboard" level="H2"/>
                     <ToolbarSpacer/>
-                    <Button text="Promote to Next Env"
-                            icon="sap-icon://accept"
-                            type="Emphasized"
-                            press=".onPromote"/>
-                    <Button text="Rollback"
-                            icon="sap-icon://undo"
-                            type="Reject"
-                            press=".onRollback"/>
-                    <Button text="Refresh"
-                            icon="sap-icon://refresh"
-                            press=".onRefresh"/>
-                </OverflowToolbar>
+
+                    <VBox justifyContent="End">
+                        <Label text="&#160;"/>
+                        <Button text="Refresh" icon="sap-icon://refresh" press=".onRefresh"/>
+                    </VBox>
+
+                </HBox>
 
                 <!-- Request Table -->
-                <Table id="requestTable" mode="MultiSelect" growing="true"
+                <Table id="requestTable" mode="None" growing="true"
                        growingScrollToLoad="true" inset="false"
                        items="{
                            path: '/ZC_CONF_REQ_H',
                            filters: [{path: 'Status', operator: 'EQ', value1: 'APPROVED'}]
                        }">
 
+                    <headerToolbar>
+                        <OverflowToolbar>
+                            <Title text="Danh sách Request đã Approved" level="H3"/>
+                            <ToolbarSpacer/>
+                        </OverflowToolbar>
+                    </headerToolbar>
+
                     <columns>
-                        <Column width="14rem"><Text text="Request ID"/></Column>
-                        <Column><Text text="Title"/></Column>
+                        <Column width="14rem"><Text text="REQ_ID"/></Column>
                         <Column width="7rem"><Text text="Module"/></Column>
-                        <Column width="9rem"><Text text="Current Env"/></Column>
-                        <Column width="9rem"><Text text="Next Env"/></Column>
+                        <Column><Text text="Config"/></Column>
                         <Column width="10rem"><Text text="Status"/></Column>
-                        <Column width="12rem"><Text text="Approved By"/></Column>
+                        <Column width="12rem"><Text text="By"/></Column>
+                        <Column width="9rem" hAlign="Center"><Text text="Action"/></Column>
                     </columns>
 
                     <items>
-                        <ColumnListItem type="Navigation" press=".onRowPress">
+                        <ColumnListItem>
                             <cells>
                                 <Text text="{ReqId}"/>
-                                <Text text="{ReqTitle}"/>
                                 <Text text="{ModuleId}"/>
+                                <Text text="{ReqTitle}"/>
                                 <ObjectStatus
-                                    text="{EnvId}"
-                                    state="{= ${EnvId} === 'PRD' ? 'Error' :
-                                              ${EnvId} === 'QAS' ? 'Warning' : 'Success'}"/>
-                                <ObjectStatus
-                                    text="{= ${EnvId} === 'DEV' ? 'QAS' :
-                                              ${EnvId} === 'QAS' ? 'PRD' : '—'}"
-                                    state="{= ${EnvId} === 'QAS' ? 'Error' :
-                                              ${EnvId} === 'DEV' ? 'Warning' : 'None'}"/>
-                                <ObjectStatus
-                                    text="{= ${Status} === 'APPROVED'     ? 'Approved' :
-                                              ${Status} === 'A'           ? 'Approved' :
-                                              ${Status} === 'ACTIVE'      ? 'Active'   :
+                                    text="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Approved' :
+                                              ${Status} === 'ACTIVE'      ? 'Applied'    :
                                               ${Status} === 'ROLLED_BACK' ? 'Rolled Back' : ${Status}}"
-                                    state="{= ${Status} === 'APPROVED'     ? 'Warning' :
-                                               ${Status} === 'A'           ? 'Warning' :
-                                               ${Status} === 'ACTIVE'      ? 'Success' :
-                                               ${Status} === 'ROLLED_BACK' ? 'Error'   : 'None'}"/>
-                                <Text text="{ApprovedBy}"/>
+                                    state="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Warning' :
+                                               ${Status} === 'ACTIVE'      ? 'Success'  :
+                                               ${Status} === 'ROLLED_BACK' ? 'Error'    : 'None'}"/>
+                                <Text text="{CreatedBy}"/>
+                                <Button
+                                    text="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Apply' : 'View'}"
+                                    type="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Emphasized' : 'Default'}"
+                                    press=".onActionPress"/>
                             </cells>
                         </ColumnListItem>
                     </items>

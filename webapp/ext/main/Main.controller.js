@@ -16,17 +16,18 @@ sap.ui.define(
       MM: {
         label: "MM Routes",
         url: "/sap/opu/odata4/sap/zui_mm_route_conf/srvd/sap/zsd_mm_route_conf/0001/MMRouteConf",
-        keyFields:  ["RouteId", "Plant"],
+        entityKey: "ItemId",      // OData primary key field (Edm.Guid)
+        keyFields:  ["PlantId", "SendWh", "ReceiveWh"],   // display-only
         diffFields: [
-          { field: "Carrier",   old: "OldCarrier"   },
-          { field: "ShipType",  old: "OldShipType"  },
-          { field: "ValidFrom", old: "OldValidFrom" },
-          { field: "ValidTo",   old: "OldValidTo"   },
+          { field: "TransMode",   old: "OldTransMode"   },
+          { field: "IsAllowed",   old: "OldIsAllowed"   },
+          { field: "InspectorId", old: "OldInspectorId" },
         ],
       },
       MMSS: {
         label: "MM Safe Stock",
         url: "/sap/opu/odata4/sap/zui_mm_safe_stock/srvd/sap/zsd_mm_safe_stock/0001/MMSafeStock",
+        entityKey: "ItemId",
         keyFields:  ["Material", "Plant"],
         diffFields: [
           { field: "SafetyStock",  old: "OldSafetyStock"  },
@@ -37,6 +38,7 @@ sap.ui.define(
       FI: {
         label: "FI Limit",
         url: "/sap/opu/odata4/sap/zui_fi_limit_conf/srvd/sap/zsd_fi_limit_conf/0001/FILimitConf",
+        entityKey: "ItemId",
         keyFields:  ["CostCenter", "GLAccount"],
         diffFields: [
           { field: "LimitAmount", old: "OldLimitAmount" },
@@ -48,6 +50,7 @@ sap.ui.define(
       SD: {
         label: "SD Price",
         url: "/sap/opu/odata4/sap/zui_sd_price_conf/srvd/sap/zsd_sd_price_conf/0001/SDPriceConf",
+        entityKey: "ItemId",
         keyFields:  ["Material", "SalesOrg"],
         diffFields: [
           { field: "Price",     old: "OldPrice"     },
@@ -58,14 +61,8 @@ sap.ui.define(
       },
     };
 
-    const _AUDIT_URL = "/sap/opu/odata4/sap/zui_audit_log/srvd/sap/zsd_audit_log/0001/AuditLog";
-
     function _getNextEnv(sEnv) {
       return sEnv === "DEV" ? "QAS" : sEnv === "QAS" ? "PRD" : null;
-    }
-
-    function _envState(sEnv) {
-      return sEnv === "PRD" ? "Error" : sEnv === "QAS" ? "Warning" : "Success";
     }
 
     return Controller.extend("zgsp26.conf.mng.itadmin.ext.main.Main", {
@@ -76,42 +73,73 @@ sap.ui.define(
         this._applyFilter();
       },
 
-      onClearFilter: function () {
-        this.byId("statusFilter").setSelectedKey("APPROVED");
-        this.byId("moduleFilter").setSelectedKey("");
-        this.byId("envFilter").setSelectedKey("");
-        this._applyFilter();
-      },
-
-      _applyFilter: function () {
-        const sStatus = this.byId("statusFilter").getSelectedKey();
-        const sModule = this.byId("moduleFilter").getSelectedKey();
-        const sEnv    = this.byId("envFilter").getSelectedKey();
-
-        const aFilters = [];
-        if (sStatus) aFilters.push(new Filter("Status",   FilterOperator.EQ, sStatus));
-        if (sModule) aFilters.push(new Filter("ModuleId", FilterOperator.EQ, sModule));
-        if (sEnv)    aFilters.push(new Filter("EnvId",    FilterOperator.EQ, sEnv));
-
+      onSearch: function (oEvent) {
+        const sQuery = oEvent.getParameter("query") || "";
+        const aFilters = this._buildFilters();
+        if (sQuery) {
+          aFilters.push(new Filter({
+            filters: [
+              new Filter("ReqId",     FilterOperator.Contains, sQuery),
+              new Filter("ReqTitle",  FilterOperator.Contains, sQuery),
+              new Filter("CreatedBy", FilterOperator.Contains, sQuery),
+            ],
+            and: false,
+          }));
+        }
         this.byId("requestTable").getBinding("items").filter(aFilters);
       },
 
-      // ─── Row press → detail dialog ────────────────────────────────────────
+      onClearFilter: function () {
+        this.byId("moduleFilter").setSelectedKey("");
+        this.byId("envFilter").setSelectedKey("");
+        this.byId("dateFilter").setValue("");
+        this.byId("searchField").setValue("");
+        this.byId("requestTable").getBinding("items").filter([
+          new Filter("Status", FilterOperator.EQ, "APPROVED"),
+        ]);
+      },
 
-      onRowPress: async function (oEvent) {
-        const oCtx = oEvent.getSource().getBindingContext();
+      _buildFilters: function () {
+        const sModule = this.byId("moduleFilter").getSelectedKey();
+        const sEnv    = this.byId("envFilter").getSelectedKey();
+        const oDate   = this.byId("dateFilter");
+        const aFilters = [];
+        if (sModule) aFilters.push(new Filter("ModuleId", FilterOperator.EQ, sModule));
+        if (sEnv)    aFilters.push(new Filter("EnvId",    FilterOperator.EQ, sEnv));
+        const dFrom = oDate.getDateValue();
+        const dTo   = oDate.getSecondDateValue();
+        if (dFrom) aFilters.push(new Filter("CreatedAt", FilterOperator.GE, dFrom));
+        if (dTo)   aFilters.push(new Filter("CreatedAt", FilterOperator.LE, dTo));
+        return aFilters;
+      },
+
+      _applyFilter: function () {
+        this.byId("requestTable").getBinding("items").filter(this._buildFilters());
+      },
+
+      // ─── Action button per row ([Apply] or [View]) ────────────────────────
+
+      onActionPress: function (oEvent) {
+        const oItem = oEvent.getSource().getParent();
+        const oCtx  = oItem.getBindingContext();
         this._oCurrentCtx = oCtx;
 
-        const sReqId      = oCtx.getProperty("ReqId");
-        const sTitle      = oCtx.getProperty("ReqTitle");
-        const sModule     = oCtx.getProperty("ModuleId");
-        const sCurEnv     = oCtx.getProperty("EnvId");
-        const sNextEnv    = _getNextEnv(sCurEnv) || "—";
-        const sStatus     = oCtx.getProperty("Status");
-        const sApprovedBy = oCtx.getProperty("ApprovedBy") || "-";
-        const sApprovedAt = oCtx.getProperty("ApprovedAt") || "-";
+        const sStatus  = oCtx.getProperty("Status");
+        const bIsApply = sStatus === "APPROVED" || sStatus === "A";
+        this._openDetailDialog(oCtx, bIsApply);
+      },
 
-        // Create dialog once
+      // ─── Open dialog ──────────────────────────────────────────────────────
+
+      _openDetailDialog: async function (oCtx, bIsApply) {
+        const sReqId   = oCtx.getProperty("ReqId");
+        const sModule  = oCtx.getProperty("ModuleId");
+        const sTitle   = oCtx.getProperty("ReqTitle") || "-";
+        const sBy      = oCtx.getProperty("CreatedBy") || "-";
+        const sReason  = oCtx.getProperty("Reason") || "-";
+        const sCurEnv  = oCtx.getProperty("EnvId") || "DEV";
+        const sNextEnv = _getNextEnv(sCurEnv) || "—";
+
         if (!this._oDetailDialog) {
           this._oDetailDialog = await Fragment.load({
             id: this.getView().getId(),
@@ -119,85 +147,53 @@ sap.ui.define(
             controller: this,
           });
           this._oDetailDialog.setModel(
-            new JSONModel({ title: "", lines: [], auditLines: [], nextEnv: "" }),
+            new JSONModel({
+              reqId: "", module: "", confName: "", by: "", reason: "",
+              nextEnv: "", isApplyMode: true,
+              lines: [], editableLines: [],
+            }),
             "detail"
           );
           this.getView().addDependent(this._oDetailDialog);
         }
 
+        // Store service ref for Apply/Promote actions
+        this._oCurrentSvc = _SERVICES[sModule];
+
         const oModel = this._oDetailDialog.getModel("detail");
+        oModel.setData({
+          reqId: sReqId, module: sModule, confName: sTitle,
+          by: sBy, reason: sReason, nextEnv: sNextEnv,
+          isApplyMode: bIsApply,
+          lines: [], editableLines: [],
+        });
 
-        // Header info
-        oModel.setProperty("/title", sTitle);
-        oModel.setProperty("/nextEnv", sNextEnv);
-        oModel.setProperty("/lines", []);
-        oModel.setProperty("/auditLines", []);
-
-        this.byId("dlgReqId").setText(sReqId);
-        this.byId("dlgApprovedBy").setText(sApprovedBy);
-        this.byId("dlgApprovedAt").setText(sApprovedAt);
-
-        const _statusLabel = { APPROVED:"Approved", A:"Approved", ACTIVE:"Active", ROLLED_BACK:"Rolled Back", REJECTED:"Rejected", DRAFT:"Draft", SUBMITTED:"Submitted" };
-        const _statusState = { APPROVED:"Warning", A:"Warning", ACTIVE:"Success", ROLLED_BACK:"Error", REJECTED:"Error", DRAFT:"None", SUBMITTED:"Information" };
-
-        const oSts = this.byId("dlgStatus");
-        oSts.setText(_statusLabel[sStatus] || sStatus);
-        oSts.setState(_statusState[sStatus] || "None");
-
-        const oCurEnvCtl = this.byId("dlgCurEnv");
-        oCurEnvCtl.setText(sCurEnv);
-        oCurEnvCtl.setState(_envState(sCurEnv));
-
-        const oNextEnvCtl = this.byId("dlgNextEnv");
-        oNextEnvCtl.setText(sNextEnv);
-        oNextEnvCtl.setState(sNextEnv !== "—" ? _envState(sNextEnv) : "None");
-
-        // Update column headers
-        this.byId("colSourceHeader").setText(sCurEnv + " (source)");
-        this.byId("colTargetHeader").setText(sNextEnv !== "—" ? sNextEnv + " (target)" : "Snapshot");
-
-        // Show/hide action buttons
-        const bApproved     = sStatus === "APPROVED" || sStatus === "A";
-        const bActive       = sStatus === "ACTIVE";
-        const bActiveMidway = bActive && sCurEnv !== "PRD";
-        this.byId("dlgPromoteBtn").setVisible((bApproved || bActiveMidway) && sNextEnv !== "—");
-        this.byId("dlgRollbackBtn").setVisible(bApproved || bActive);
-
-        // Reset tables
         this.byId("previewTable").setNoDataText("Loading config changes...");
-        this.byId("auditTable").setNoDataText("Loading audit trail...");
-
         this._oDetailDialog.open();
 
-        // Fetch data in parallel
-        Promise.all([
-          this._fetchConfigLines(sReqId, sModule, sCurEnv, sNextEnv),
-          this._fetchAuditLines(sReqId),
-        ]).then(([aLines, aAudit]) => {
+        this._fetchConfigLines(sReqId, sModule, sCurEnv, sNextEnv).then((aLines) => {
           oModel.setProperty("/lines", aLines);
-          oModel.setProperty("/auditLines", aAudit);
+          // Editable table: only rows with actual changes
+          oModel.setProperty("/editableLines",
+            aLines.filter(function (r) { return r.changed; })
+          );
           this.byId("previewTable").setNoDataText(
-            aLines.length ? "" : "No config changes found."
+            aLines.length ? "" : "Không có thay đổi nào."
           );
-          this.byId("auditTable").setNoDataText(
-            aAudit.length ? "" : "No audit records found."
-          );
-        }).catch(e => {
+        }).catch(function (e) {
           console.error(e);
-          this.byId("previewTable").setNoDataText("Failed to load: " + (e.message || e));
         });
       },
 
-      // ─── Fetch config lines (Preview Changes tab) ─────────────────────────
+      // ─── Fetch & normalize config lines ──────────────────────────────────
 
-      _fetchConfigLines: async function (sReqId, sModuleId, sCurEnv, sNextEnv) {
+      _fetchConfigLines: async function (sReqId, sModuleId) {
         const aKeys = sModuleId ? [sModuleId] : Object.keys(_SERVICES);
 
         for (const sKey of aKeys) {
           const oSvc = _SERVICES[sKey];
           if (!oSvc) continue;
           try {
-            // ReqId is Edm.Guid in OData V4 — no quotes
             const sUrl = oSvc.url + "?$filter=ReqId eq " + sReqId;
             const oResp = await fetch(sUrl, {
               headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
@@ -206,7 +202,9 @@ sap.ui.define(
             const oData = await oResp.json();
             const aItems = oData.value || [];
             if (!aItems.length) continue;
-            return this._normalizeLines(aItems, oSvc, sCurEnv, sNextEnv);
+            // Store service ref for later use in Apply
+            this._oCurrentSvc = oSvc;
+            return this._normalizeLines(aItems, oSvc);
           } catch (e) {
             console.warn("Service " + sKey + " failed:", e);
           }
@@ -214,155 +212,106 @@ sap.ui.define(
         return [];
       },
 
-      _normalizeLines: function (aItems, oSvc, sCurEnv, sNextEnv) {
+      _normalizeLines: function (aItems, oSvc) {
         const aRows = [];
         aItems.forEach(function (oItem) {
-          const sKey = oSvc.keyFields
+          // Build OData V4 entity path for PATCH: url(ItemId=guid,IsActiveEntity=true)
+          const sEntityPath = oSvc.url + "(" + oSvc.entityKey + "=" + oItem[oSvc.entityKey] + ",IsActiveEntity=true)";
+          const sKeyInfo = oSvc.keyFields
             .map(function (f) { return f + ": " + (oItem[f] || "-"); })
             .join(" | ");
 
           oSvc.diffFields.forEach(function (d) {
-            const sSource = String(oItem[d.field] || "");
-            const sTarget = String(oItem[d.old]   || "");
+            const sOldVal = oItem[d.old]   != null ? String(oItem[d.old])   : "";
+            const sNewVal = oItem[d.field]  != null ? String(oItem[d.field]) : "";
             aRows.push({
-              keyInfo:   sKey,
-              field:     d.field,
-              action:    "UPDATE",
-              sourceVal: sSource,
-              targetVal: sTarget,
-              changed:   sSource !== sTarget,
+              keyInfo:    sKeyInfo,
+              field:      d.field,
+              oldVal:     sOldVal,
+              newVal:     sNewVal,
+              changed:    sOldVal !== sNewVal,
+              entityPath: sEntityPath,    // needed for PATCH in Apply
             });
           });
         });
         return aRows;
       },
 
-      // ─── Fetch audit trail ────────────────────────────────────────────────
+      // ─── Dialog: Apply (gọi backend action apply → lưu vào bảng chính) ────
 
-      _fetchAuditLines: async function (sReqId) {
-        try {
-          const sUrl = _AUDIT_URL + "?$filter=ReqId eq " + sReqId + "&$orderby=ChangedAt desc";
-          const oResp = await fetch(sUrl, {
-            headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
-          });
-          if (!oResp.ok) return [];
-          const oData = await oResp.json();
-          return oData.value || [];
-        } catch (e) {
-          console.warn("Audit log fetch failed:", e);
-          return [];
-        }
-      },
+      onDialogApply: function () {
+        const sReqId = this._oCurrentCtx.getProperty("ReqId");
 
-      // ─── Dialog buttons ───────────────────────────────────────────────────
-
-      onDialogClose: function () {
-        this._oDetailDialog.close();
-      },
-
-      onDialogPromote: function () {
-        const sCurEnv  = this._oCurrentCtx.getProperty("EnvId");
-        const sNextEnv = _getNextEnv(sCurEnv);
-        this._oDetailDialog.close();
-        this._executePromote([this._oCurrentCtx], sCurEnv, sNextEnv, () => {
-          this.byId("requestTable").getBinding("items").refresh();
-        });
-      },
-
-      onDialogRollback: function () {
-        // First click: switch to Rollback Preview tab so IT Admin sees impact
-        const oTabs = this.byId("detailTabs");
-        if (oTabs.getSelectedKey() !== "rollback") {
-          oTabs.setSelectedKey("rollback");
-          MessageToast.show("Review the Rollback Preview tab, then click Rollback again to confirm.");
-          return;
-        }
-        // Second click (already on rollback tab): execute
-        this._oDetailDialog.close();
-        this._executeAction("rollback", [this._oCurrentCtx], () => {
-          this.byId("requestTable").getBinding("items").refresh();
-        });
-      },
-
-      // ─── Toolbar: Promote / Rollback (multi-select) ───────────────────────
-
-      onPromote: function () {
-        const aSelected = this.byId("requestTable").getSelectedItems();
-        if (!aSelected.length) {
-          MessageToast.show("Please select at least one request");
-          return;
-        }
-        const aInvalid = aSelected.filter(o => {
-          const s = o.getBindingContext().getProperty("Status");
-          const e = o.getBindingContext().getProperty("EnvId");
-          const bApproved = s === "A" || s === "APPROVED";
-          const bActiveMidway = s === "ACTIVE" && e !== "PRD";
-          return !bApproved && !bActiveMidway;
-        });
-        if (aInvalid.length) {
-          MessageBox.warning("Only 'Approved' or 'Active' (non-PRD) requests can be promoted.");
-          return;
-        }
-        const aCtxs = aSelected.map(o => o.getBindingContext());
-        // All selected must have same EnvId for batch promote
-        const sCurEnv  = aCtxs[0].getProperty("EnvId");
-        const sNextEnv = _getNextEnv(sCurEnv);
-        this._executePromote(aCtxs, sCurEnv, sNextEnv, () => {
-          this.byId("requestTable").getBinding("items").refresh();
-        });
-      },
-
-      onRollback: function () {
-        const aSelected = this.byId("requestTable").getSelectedItems();
-        if (!aSelected.length) {
-          MessageToast.show("Please select at least one request");
-          return;
-        }
-        const aInvalid = aSelected.filter(o => {
-          const s = o.getBindingContext().getProperty("Status");
-          return s !== "A" && s !== "APPROVED" && s !== "ACTIVE";
-        });
-        if (aInvalid.length) {
-          MessageBox.warning("Only 'Approved' or 'Active' requests can be rolled back.");
-          return;
-        }
-        const aCtxs = aSelected.map(o => o.getBindingContext());
-        this._executeAction("rollback", aCtxs, () => {
-          this.byId("requestTable").getBinding("items").refresh();
-        });
-      },
-
-      // ─── Promote (with TargetEnv) ─────────────────────────────────────────
-
-      _executePromote: function (aContexts, sCurEnv, sNextEnv, fnSuccess) {
-        if (!sNextEnv) {
-          MessageBox.warning("This request is already at PRD — no further environment to promote.");
-          return;
-        }
         MessageBox.confirm(
-          "Promote " + aContexts.length + " request(s)?\n" +
-          sCurEnv + " → " + sNextEnv + "\nConfig data will be copied to " + sNextEnv + ".",
+          "Apply configuration này vào bảng chính?\n" +
+          "REQ_ID: " + sReqId + "\n" +
+          "Dữ liệu thay đổi sẽ được ghi vào bảng cấu hình chính.",
           {
+            actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
+            emphasizedAction: MessageBox.Action.OK,
             onClose: async (sResult) => {
-              if (sResult !== "OK") return;
+              if (sResult !== MessageBox.Action.OK) return;
+
+              this._oDetailDialog.close();
               const oView = this.getView();
               oView.setBusy(true);
               try {
-                for (const oCtx of aContexts) {
-                  // TODO: thêm setParameter("TargetEnv", sNextEnv) sau khi BE khai báo param trong BDEF
-                  await oCtx.getModel().bindContext(
-                    "com.sap.gateway.srvd.zsd_conf_req.v0001.promote(...)",
-                    oCtx
-                  ).execute("$auto");
-                }
-                fnSuccess();
+                await this._oCurrentCtx.getModel().bindContext(
+                  "com.sap.gateway.srvd.zsd_conf_req.v0001.apply(...)",
+                  this._oCurrentCtx
+                ).execute("$auto");
+                this.byId("requestTable").getBinding("items").refresh();
+                MessageBox.success("Đã apply thành công vào bảng chính.");
+              } catch (e) {
+                console.error(e);
+                MessageBox.error(
+                  "Apply thất bại.\n" +
+                  "Lưu ý: Backend cần khai báo action 'apply' trong BDEF.\n" +
+                  "Chi tiết: " + (e.message || e)
+                );
+              } finally {
+                oView.setBusy(false);
+              }
+            },
+          }
+        );
+      },
+
+      // ─── Dialog: Promote (copy dòng mới với EnvId = nextEnv) ────────────
+
+      onDialogPromote: function () {
+        const sCurEnv  = this._oCurrentCtx.getProperty("EnvId") || "DEV";
+        const sNextEnv = _getNextEnv(sCurEnv);
+
+        if (!sNextEnv) {
+          MessageBox.warning("Request này đã ở PRD — không thể promote thêm.");
+          return;
+        }
+
+        const sReqId  = this._oCurrentCtx.getProperty("ReqId");
+        const sModule = this._oCurrentCtx.getProperty("ModuleId");
+
+        MessageBox.confirm(
+          "Promote " + sCurEnv + " → " + sNextEnv + "?\n" +
+          "Các dòng cấu hình sẽ được copy sang " + sNextEnv + " với EnvId mới.",
+          {
+            actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
+            emphasizedAction: MessageBox.Action.OK,
+            onClose: async (sResult) => {
+              if (sResult !== MessageBox.Action.OK) return;
+
+              this._oDetailDialog.close();
+              const oView = this.getView();
+              oView.setBusy(true);
+              try {
+                await this._promoteConfigItems(sReqId, sModule, sCurEnv, sNextEnv);
+                this.byId("requestTable").getBinding("items").refresh();
                 MessageBox.success(
-                  "Promoted " + aContexts.length + " request(s) from " +
-                  sCurEnv + " to " + sNextEnv + "."
+                  "Đã promote thành công lên " + sNextEnv + "."
                 );
               } catch (e) {
                 console.error(e);
-                MessageBox.error("Promote failed: " + (e.message || e));
+                MessageBox.error("Promote thất bại: " + (e.message || e));
               } finally {
                 oView.setBusy(false);
               }
@@ -371,35 +320,92 @@ sap.ui.define(
         );
       },
 
-      // ─── Rollback ─────────────────────────────────────────────────────────
+      // ─── Promote: fetch items → POST dòng mới với EnvId = nextEnv ─────────
 
-      _executeAction: function (sAction, aContexts, fnSuccess) {
-        MessageBox.confirm(
-          "Rollback " + aContexts.length + " request(s)?\n⚠ This will restore the previous configuration values.",
-          {
-            emphasizedAction: "Cancel",
-            onClose: async (sResult) => {
-              if (sResult !== "OK") return;
-              const oView = this.getView();
-              oView.setBusy(true);
-              try {
-                for (const oCtx of aContexts) {
-                  await oCtx.getModel().bindContext(
-                    "com.sap.gateway.srvd.zsd_conf_req.v0001." + sAction + "(...)",
-                    oCtx
-                  ).execute("$auto");
-                }
-                fnSuccess();
-                MessageBox.success("Rollback completed for " + aContexts.length + " request(s).");
-              } catch (e) {
-                console.error(e);
-                MessageBox.error("Rollback failed: " + (e.message || e));
-              } finally {
-                oView.setBusy(false);
-              }
+      _promoteConfigItems: async function (sReqId, sModule, sCurEnv, sNextEnv) {
+        const oSvc = _SERVICES[sModule] || this._oCurrentSvc;
+        if (!oSvc) throw new Error("Không tìm thấy service cho module: " + sModule);
+
+        // 1. Fetch config items của request hiện tại
+        const sFilterUrl = oSvc.url +
+          "?$filter=ReqId eq " + sReqId +
+          " and EnvId eq '" + sCurEnv + "'";
+
+        const oFetchResp = await fetch(sFilterUrl, {
+          headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!oFetchResp.ok) {
+          throw new Error("Lấy config items thất bại (" + oFetchResp.status + ")");
+        }
+        const oData  = await oFetchResp.json();
+        const aItems = oData.value || [];
+
+        if (!aItems.length) {
+          throw new Error("Không có config item nào cho " + sCurEnv + " - ReqId: " + sReqId);
+        }
+
+        // 2. Fetch CSRF token
+        const sCsrf = await this._fetchCsrfToken(oSvc.url);
+
+        // 3. POST từng dòng mới, chỉ giữ business fields, đổi EnvId = nextEnv
+        const _SYSTEM_FIELDS = new Set([
+          "ItemId", "IsActiveEntity", "HasDraftEntity", "HasActiveEntity",
+          "DraftEntityCreationDateTime", "DraftEntityLastChangeDateTime",
+          "CreatedBy", "CreatedAt", "ChangedBy", "ChangedAt",
+          "__EntityControl", "__OperationControl", "SAP__Messages",
+        ]);
+
+        for (const oItem of aItems) {
+          const oNewItem = {};
+          Object.keys(oItem).forEach(function (k) {
+            if (!_SYSTEM_FIELDS.has(k) && typeof oItem[k] !== "object") {
+              oNewItem[k] = oItem[k];
+            }
+          });
+          oNewItem.EnvId = sNextEnv;   // đổi sang môi trường mới
+
+          const oPostResp = await fetch(oSvc.url, {
+            method: "POST",
+            headers: {
+              "Content-Type":     "application/json",
+              "Accept":           "application/json",
+              "X-CSRF-Token":     sCsrf,
+              "X-Requested-With": "XMLHttpRequest",
             },
+            body: JSON.stringify(oNewItem),
+          });
+
+          if (!oPostResp.ok) {
+            const sErr = await oPostResp.text().catch(function () { return ""; });
+            throw new Error(
+              "POST thất bại (" + oPostResp.status + ")" +
+              (sErr ? ": " + sErr.substring(0, 200) : "")
+            );
           }
-        );
+        }
+      },
+
+      // ─── CSRF token helper ────────────────────────────────────────────────
+
+      _fetchCsrfToken: async function (sServiceUrl) {
+        const oResp = await fetch(sServiceUrl, {
+          method: "HEAD",
+          headers: {
+            "X-CSRF-Token":     "Fetch",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        });
+        const sToken = oResp.headers.get("X-CSRF-Token");
+        if (!sToken || sToken === "Required") {
+          throw new Error("Không lấy được CSRF token");
+        }
+        return sToken;
+      },
+
+      // ─── Dialog: Close ────────────────────────────────────────────────────
+
+      onDialogClose: function () {
+        this._oDetailDialog.close();
       },
 
       // ─── Refresh ──────────────────────────────────────────────────────────
