@@ -5,9 +5,7 @@
     xmlns:l="sap.ui.layout">
 
     <Dialog id="detailDialog"
-            title="{= ${detail>/isApplyMode} ? 'Apply Configuration — REQ_ID: ' + ${detail>/reqId} :
-                       ${detail>/isPromoteMode} ? 'Promote Configuration — REQ_ID: ' + ${detail>/reqId} :
-                       'View Configuration — REQ_ID: ' + ${detail>/reqId} }"
+            title="Configuration Detail — REQ_ID: {detail>/reqId}"
             contentWidth="60rem" contentHeight="44rem"
             verticalScrolling="false" draggable="true" resizable="true">
 
@@ -70,57 +68,24 @@
                     </Table>
                 </Panel>
 
-                <!-- Editable table (IT Admin có thể sửa trước khi Apply) -->
-                <Panel id="editablePanel"
-                       headerText="IT Admin có thể sửa trực tiếp trước khi Apply"
-                       expandable="true" expanded="true"
-                       visible="{= ${detail>/isApplyMode} &amp;&amp; !${detail>/isPromoteMode}}"
-                       class="sapUiTinyMarginBottom">
-                    <VBox>
-                        <MessageStrip
-                            text="Chỉ hiển thị các dòng có thay đổi. Bạn có thể chỉnh sửa giá trị mới trước khi Apply."
-                            type="Information" showIcon="true" showCloseButton="false"
-                            class="sapUiTinyMarginBottom sapUiTinyMargin"/>
-                        <Table id="editableTable" inset="false"
-                               noDataText="Không có thay đổi nào."
-                               items="{detail>/editableLines}">
-                            <columns>
-                                <Column width="10rem"><Text text="Field"/></Column>
-                                <Column><Text text="Giá trị cũ"/></Column>
-                                <Column><Text text="Giá trị mới (có thể sửa)"/></Column>
-                            </columns>
-                            <items>
-                                <ColumnListItem>
-                                    <cells>
-                                        <Text text="{detail>field}"/>
-                                        <Text text="{detail>oldVal}"/>
-                                        <Input value="{detail>newVal}" width="100%"/>
-                                    </cells>
-                                </ColumnListItem>
-                            </items>
-                        </Table>
-                    </VBox>
-                </Panel>
 
             </VBox>
         </content>
 
         <buttons>
-            <!-- Apply: lưu data vào bảng chính qua PATCH -->
-            <Button id="dlgApplyBtn"
-                    text="Apply"
-                    icon="sap-icon://save"
-                    type="Emphasized"
-                    visible="{detail>/isApplyMode}"
-                    press=".onDialogApply"/>
-            <!-- Promote: chuyển môi trường lên tầng cao hơn -->
             <Button id="dlgPromoteBtn"
-                    text="{= ${detail>/nextEnv} !== '—' ? 'Promote ' : 'Promote'}"
+                    text="{= 'Promote → ' + ${detail>/nextEnv}}"
                     icon="sap-icon://journey-arrive"
                     type="Accept"
-                    visible="{= ${detail>/isApplyMode} || ${detail>/isPromoteMode}}"
+                    visible="{detail>/isPromoteMode}"
                     press=".onDialogPromote"/>
-            <Button text="{= ${detail>/isApplyMode} ? 'Cancel' : 'Close'}"
+            <Button id="dlgRollbackBtn"
+                    text="Rollback"
+                    icon="sap-icon://undo"
+                    type="Reject"
+                    visible="{detail>/isRollbackMode}"
+                    press=".onDialogRollback"/>
+            <Button text="Close"
                     press=".onDialogClose"/>
         </buttons>
 

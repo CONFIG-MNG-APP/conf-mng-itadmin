@@ -64,12 +64,12 @@
                        growingScrollToLoad="true" inset="false"
                        items="{
                            path: '/ZC_CONF_REQ_H',
-                           filters: [{path: 'Status', operator: 'EQ', value1: 'APPROVED'}]
+                           filters: [{path: 'Status', operator: 'EQ', value1: 'ACTIVE'}]
                        }">
 
                     <headerToolbar>
                         <OverflowToolbar>
-                            <Title text="Danh sách Request đã Approved" level="H3"/>
+                            <Title text="Danh sách Request đã Active" level="H3"/>
                             <ToolbarSpacer/>
                         </OverflowToolbar>
                     </headerToolbar>
@@ -98,11 +98,9 @@
                                                ${Status} === 'ROLLED_BACK' ? 'Error'    : 'None'}"/>
                                 <Text text="{CreatedBy}"/>
                                 <Button
-                                    text="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Apply' :
-                                              (${Status} === 'ACTIVE' &amp;&amp; ${EnvId} !== 'PRD') ? 'Promote' : 'View'}"
-                                    type="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Emphasized' :
-                                               (${Status} === 'ACTIVE' &amp;&amp; ${EnvId} !== 'PRD') ? 'Accept' : 'Default'}"
-                                    icon="{= (${Status} === 'ACTIVE' &amp;&amp; ${EnvId} !== 'PRD') ? 'sap-icon://journey-arrive' : ''}"
+                                    text="{= ${EnvId} !== 'PRD' ? 'Promote' : 'View'}"
+                                    type="{= ${EnvId} !== 'PRD' ? 'Accept' : 'Default'}"
+                                    icon="{= ${EnvId} !== 'PRD' ? 'sap-icon://journey-arrive' : ''}"
                                     press=".onActionPress"/>
                             </cells>
                         </ColumnListItem>

@@ -95,7 +95,7 @@ sap.ui.define(
         this.byId("dateFilter").setValue("");
         this.byId("searchField").setValue("");
         this.byId("requestTable").getBinding("items").filter([
-          new Filter("Status", FilterOperator.EQ, "APPROVED"),
+          new Filter("Status", FilterOperator.EQ, "ACTIVE"),
         ]);
       },
 
@@ -124,16 +124,14 @@ sap.ui.define(
         const oCtx  = oItem.getBindingContext();
         this._oCurrentCtx = oCtx;
 
-        const sStatus     = oCtx.getProperty("Status");
-        const sEnvId      = oCtx.getProperty("EnvId") || "DEV";
-        const bIsApply    = sStatus === "APPROVED" || sStatus === "A";
-        const bIsPromote  = sStatus === "ACTIVE" && sEnvId !== "PRD";
-        this._openDetailDialog(oCtx, bIsApply, bIsPromote);
+        const sEnvId     = oCtx.getProperty("EnvId") || "DEV";
+        const bIsPromote = sEnvId !== "PRD";
+        this._openDetailDialog(oCtx, bIsPromote);
       },
 
       // ─── Open dialog ──────────────────────────────────────────────────────
 
-      _openDetailDialog: async function (oCtx, bIsApply, bIsPromote) {
+      _openDetailDialog: async function (oCtx, bIsPromote) {
         const sReqId   = oCtx.getProperty("ReqId");
         const sModule  = oCtx.getProperty("ModuleId");
         const sTitle   = oCtx.getProperty("ReqTitle") || "-";
@@ -151,8 +149,8 @@ sap.ui.define(
           this._oDetailDialog.setModel(
             new JSONModel({
               reqId: "", module: "", confName: "", by: "", reason: "",
-              nextEnv: "", isApplyMode: true, isPromoteMode: false,
-              lines: [], editableLines: [],
+              nextEnv: "", isPromoteMode: false,
+              lines: [],
             }),
             "detail"
           );
@@ -162,13 +160,15 @@ sap.ui.define(
         // Store service ref for Apply/Promote actions
         this._oCurrentSvc = _SERVICES[sModule];
 
+        const sStatus  = oCtx.getProperty("Status") || "";
+
         const oModel = this._oDetailDialog.getModel("detail");
         oModel.setData({
           reqId: sReqId, module: sModule, confName: sTitle,
           by: sBy, reason: sReason, nextEnv: sNextEnv,
-          isApplyMode: bIsApply,
-          isPromoteMode: !!bIsPromote,
-          lines: [], editableLines: [],
+          isPromoteMode:  !!bIsPromote,
+          isRollbackMode: sStatus === "ACTIVE",
+          lines: [],
         });
 
         this.byId("previewTable").setNoDataText("Loading config changes...");
@@ -176,10 +176,6 @@ sap.ui.define(
 
         this._fetchConfigLines(sReqId, sModule, sCurEnv, sNextEnv).then((aLines) => {
           oModel.setProperty("/lines", aLines);
-          // Editable table: only rows with actual changes
-          oModel.setProperty("/editableLines",
-            aLines.filter(function (r) { return r.changed; })
-          );
           this.byId("previewTable").setNoDataText(
             aLines.length ? "" : "Không có thay đổi nào."
           );
@@ -240,18 +236,19 @@ sap.ui.define(
         return aRows;
       },
 
-      // ─── Dialog: Apply (gọi backend action apply → lưu vào bảng chính) ────
+      // ─── Dialog: Rollback (revert config về OldXxx, status → ROLLED_BACK) ─
 
-      onDialogApply: function () {
-        const sReqId = this._oCurrentCtx.getProperty("ReqId");
+      onDialogRollback: function () {
+        const sReqId  = this._oCurrentCtx.getProperty("ReqId");
+        const sEnvId  = this._oCurrentCtx.getProperty("EnvId") || "DEV";
 
         MessageBox.confirm(
-          "Apply configuration này vào bảng chính?\n" +
-          "REQ_ID: " + sReqId + "\n" +
-          "Dữ liệu thay đổi sẽ được ghi vào bảng cấu hình chính.",
+          "Rollback configuration này?\n" +
+          "REQ_ID: " + sReqId + " — ENV: " + sEnvId + "\n" +
+          "Dữ liệu sẽ được revert về giá trị cũ. Hành động này không thể hoàn tác.",
           {
             actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
-            emphasizedAction: MessageBox.Action.OK,
+            emphasizedAction: MessageBox.Action.CANCEL,
             onClose: async (sResult) => {
               if (sResult !== MessageBox.Action.OK) return;
 
@@ -260,18 +257,14 @@ sap.ui.define(
               oView.setBusy(true);
               try {
                 await this._oCurrentCtx.getModel().bindContext(
-                  "com.sap.gateway.srvd.zsd_conf_req.v0001.apply(...)",
+                  "com.sap.gateway.srvd.zsd_conf_req.v0001.rollback(...)",
                   this._oCurrentCtx
                 ).execute("$auto");
                 this.byId("requestTable").getBinding("items").refresh();
-                MessageBox.success("Đã apply thành công vào bảng chính.");
+                MessageBox.success("Đã rollback thành công — ENV: " + sEnvId + ".");
               } catch (e) {
                 console.error(e);
-                MessageBox.error(
-                  "Apply thất bại.\n" +
-                  "Lưu ý: Backend cần khai báo action 'apply' trong BDEF.\n" +
-                  "Chi tiết: " + (e.message || e)
-                );
+                MessageBox.error("Rollback thất bại: " + (e.message || e));
               } finally {
                 oView.setBusy(false);
               }
