@@ -46,7 +46,7 @@ sap.ui.define(
       },
       FI: {
         label: "FI Limit",
-        url:    "/sap/opu/odata4/sap/zui_fi_limit_conf/srvd/sap/zsd_fi_limit_conf/0001/ZC_FI_LIMIT_CONF",
+        url:    "/sap/opu/odata4/sap/zui_fi_limit_conf/srvd/sap/zsd_fi_limit_conf/0001/FILimitMain",
         reqUrl: "/sap/opu/odata4/sap/zui_fi_limit_conf/srvd/sap/zsd_fi_limit_conf/0001/ZC_FI_LIMIT_CONF",
         entityKey: "ItemId",
         keyFields:  ["ExpenseType", "GlAccount"],
