@@ -8,17 +8,86 @@
         <content>
             <VBox class="sapUiSmallMargin">
 
-                <!-- Filter Bar -->
-                <HBox wrap="Wrap" alignItems="End" class="sapUiTinyMarginBottom sapUiSmallMarginTop">
+                <!-- ══════════════════════════════════════════════════════════
+                     KPI DASHBOARD
+                ══════════════════════════════════════════════════════════ -->
+                <HBox wrap="Wrap" class="sapUiSmallMarginBottom sapUiSmallMarginTop" alignItems="Stretch">
+
+                    <GenericTile class="sapUiTinyMarginEnd sapUiTinyMarginBottom"
+                        frameType="TwoByOne" header="DEV"
+                        subheader="Requests đang ở DEV">
+                        <tileContent>
+                            <TileContent>
+                                <content>
+                                    <NumericContent value="{kpi>/atDev}"
+                                        valueColor="None"
+                                        icon="sap-icon://developer-settings"
+                                        withMargin="false"/>
+                                </content>
+                            </TileContent>
+                        </tileContent>
+                    </GenericTile>
+
+                    <GenericTile class="sapUiTinyMarginEnd sapUiTinyMarginBottom"
+                        frameType="TwoByOne" header="QAS"
+                        subheader="Requests đang ở QAS">
+                        <tileContent>
+                            <TileContent>
+                                <content>
+                                    <NumericContent value="{kpi>/atQas}"
+                                        valueColor="Critical"
+                                        icon="sap-icon://quality-issue"
+                                        withMargin="false"/>
+                                </content>
+                            </TileContent>
+                        </tileContent>
+                    </GenericTile>
+
+                    <GenericTile class="sapUiTinyMarginEnd sapUiTinyMarginBottom"
+                        frameType="TwoByOne" header="PRD"
+                        subheader="Requests đã lên PRD">
+                        <tileContent>
+                            <TileContent>
+                                <content>
+                                    <NumericContent value="{kpi>/atPrd}"
+                                        valueColor="Good"
+                                        icon="sap-icon://flag"
+                                        withMargin="false"/>
+                                </content>
+                            </TileContent>
+                        </tileContent>
+                    </GenericTile>
+
+                    <GenericTile class="sapUiTinyMarginEnd sapUiTinyMarginBottom"
+                        frameType="TwoByOne" header="Total"
+                        subheader="Tổng request trong hệ thống">
+                        <tileContent>
+                            <TileContent>
+                                <content>
+                                    <NumericContent value="{kpi>/total}"
+                                        icon="sap-icon://documents"
+                                        withMargin="false"/>
+                                </content>
+                            </TileContent>
+                        </tileContent>
+                    </GenericTile>
+
+                </HBox>
+
+                <!-- ══════════════════════════════════════════════════════════
+                     FILTER BAR
+                ══════════════════════════════════════════════════════════ -->
+                <HBox wrap="Wrap" alignItems="End" class="sapUiTinyMarginBottom">
 
                     <VBox class="sapUiSmallMarginEnd">
                         <Label text="Module"/>
                         <Select id="moduleFilter" width="10rem" selectedKey="" change=".onFilter">
                             <items>
-                                <core:Item key=""   text="All Modules"/>
-                                <core:Item key="MM" text="MM"/>
-                                <core:Item key="FI" text="FI"/>
-                                <core:Item key="SD" text="SD"/>
+                                <core:Item key=""     text="All Modules"/>
+                                <core:Item key="MM"   text="MM"/>
+                                <core:Item key="MMSS" text="MMSS"/>
+                                <core:Item key="FI"   text="FI"/>
+                                <core:Item key="SD"   text="SD"/>
                             </items>
                         </Select>
                     </VBox>
@@ -59,26 +128,26 @@
 
                 </HBox>
 
-                <!-- Request Table -->
-                <Table id="requestTable" mode="None" growing="true"
-                       growingScrollToLoad="true" inset="false"
-                       items="{
-                           path: '/ZC_CONF_REQ_H',
-                           filters: [{path: 'Status', operator: 'EQ', value1: 'ACTIVE'}]
-                       }">
+                <!-- ══════════════════════════════════════════════════════════
+                     REQUEST TABLE  (bound to vm JSONModel — deduplicated)
+                ══════════════════════════════════════════════════════════ -->
+                <Table id="requestTable" mode="None" inset="false"
+                       noDataText="No data"
+                       items="{vm>/requests}">
 
                     <headerToolbar>
                         <OverflowToolbar>
-                            <Title text="Danh sách Request đã Active" level="H3"/>
+                            <Title id="tableTitle" text="Tất cả Request (tiến độ mới nhất)" level="H3"/>
                             <ToolbarSpacer/>
+                            <Text text="{= ${vm>/requests}.length + ' items'}" class="sapUiTinyMarginEnd"/>
                         </OverflowToolbar>
                     </headerToolbar>
 
                     <columns>
-                        <Column width="14rem"><Text text="REQ_ID"/></Column>
+                        <Column width="13rem"><Text text="REQ_ID"/></Column>
                         <Column width="7rem"><Text text="Module"/></Column>
-                        <Column><Text text="Config"/></Column>
-                        <Column width="10rem"><Text text="Status"/></Column>
+                        <Column><Text text="Key Info"/></Column>
+                        <Column width="21rem"><Text text="Environment Journey"/></Column>
                         <Column width="12rem"><Text text="By"/></Column>
                         <Column width="9rem" hAlign="Center"><Text text="Action"/></Column>
                     </columns>
@@ -86,21 +155,40 @@
                     <items>
                         <ColumnListItem>
                             <cells>
-                                <Text text="{ReqId}"/>
-                                <Text text="{ModuleId}"/>
-                                <Text text="{ReqTitle}"/>
-                                <ObjectStatus
-                                    text="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Approved' :
-                                              ${Status} === 'ACTIVE'      ? 'Applied'    :
-                                              ${Status} === 'ROLLED_BACK' ? 'Rolled Back' : ${Status}}"
-                                    state="{= ${Status} === 'APPROVED' || ${Status} === 'A' ? 'Warning' :
-                                               ${Status} === 'ACTIVE'      ? 'Success'  :
-                                               ${Status} === 'ROLLED_BACK' ? 'Error'    : 'None'}"/>
-                                <Text text="{CreatedBy}"/>
+                                <Text text="{vm>ReqId}"/>
+                                <Text text="{vm>ModuleId}"/>
+                                <Text text="{vm>_keyInfo}"/>
+
+                                <!-- Environment Journey: DEV → QAS → PRD -->
+                                <HBox alignItems="Center">
+                                    <core:Icon
+                                        src="{= ${vm>EnvId} === 'DEV' ? 'sap-icon://circle-task-2' : 'sap-icon://accept'}"
+                                        color="{= ${vm>EnvId} === 'DEV' ? '#0070F2' : '#107E3E'}"
+                                        size="0.9rem"/>
+                                    <Text text=" DEV " class="sapUiTinyMarginEnd sapUiTinyMarginBegin"/>
+                                    <Text text="→" class="sapUiTinyMarginEnd"/>
+                                    <core:Icon
+                                        src="{= ${vm>EnvId} === 'QAS' ? 'sap-icon://circle-task-2' :
+                                                  ${vm>EnvId} === 'PRD' ? 'sap-icon://accept'       : 'sap-icon://circle-task'}"
+                                        color="{= ${vm>EnvId} === 'QAS' ? '#0070F2' :
+                                                   ${vm>EnvId} === 'PRD' ? '#107E3E' : '#89919A'}"
+                                        size="0.9rem"/>
+                                    <Text text=" QAS " class="sapUiTinyMarginEnd sapUiTinyMarginBegin"/>
+                                    <Text text="→" class="sapUiTinyMarginEnd"/>
+                                    <core:Icon
+                                        src="{= ${vm>EnvId} === 'PRD' ? 'sap-icon://circle-task-2' : 'sap-icon://circle-task'}"
+                                        color="{= ${vm>EnvId} === 'PRD' ? '#0070F2' : '#89919A'}"
+                                        size="0.9rem"/>
+                                    <Text text=" PRD" class="sapUiTinyMarginBegin"/>
+                                </HBox>
+
+                                <Text text="{vm>CreatedBy}"/>
+
+                                <!-- Action button: Promote khi chưa ở PRD -->
                                 <Button
-                                    text="{= ${EnvId} !== 'PRD' ? 'Promote' : 'View'}"
-                                    type="{= ${EnvId} !== 'PRD' ? 'Accept' : 'Default'}"
-                                    icon="{= ${EnvId} !== 'PRD' ? 'sap-icon://journey-arrive' : ''}"
+                                    text="{= ${vm>EnvId} !== 'PRD' ? 'Promote' : 'View'}"
+                                    type="{= ${vm>EnvId} !== 'PRD' ? 'Accept' : 'Default'}"
+                                    icon="{= ${vm>EnvId} !== 'PRD' ? 'sap-icon://journey-arrive' : 'sap-icon://detail-view'}"
                                     press=".onActionPress"/>
                             </cells>
                         </ColumnListItem>

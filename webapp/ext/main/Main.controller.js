@@ -101,7 +101,6 @@ sap.ui.define(
           new JSONModel({ requests: [] }),
           "vm"
         );
-        this._refreshKpi();
         this._loadRequests();
       },
 
@@ -187,7 +186,18 @@ sap.ui.define(
             }
           }
 
-          let aResult = Object.values(oMap);
+          // Chỉ giữ items có ReqId hợp lệ — giống logic list bên dưới
+          const aDeduped = Object.values(oMap).filter(function (i) { return !!i.ReqId; });
+
+          // ── KPI: đếm unique ReqId giống list (trước khi apply ENV/search filter) ──
+          this.getView().getModel("kpi").setData({
+            atDev:  aDeduped.filter(function (i) { return i.EnvId === "DEV"; }).length,
+            atQas:  aDeduped.filter(function (i) { return i.EnvId === "QAS"; }).length,
+            atPrd:  aDeduped.filter(function (i) { return i.EnvId === "PRD"; }).length,
+            total:  aDeduped.length,
+          });
+
+          let aResult = aDeduped.slice();
 
           // Client-side: ENV filter (uses overridden EnvId)
           const sEnv = this.byId("envFilter").getSelectedKey();
@@ -211,35 +221,6 @@ sap.ui.define(
           MessageBox.error("Không thể tải dữ liệu: " + (e.message || e));
         } finally {
           oView.setBusy(false);
-        }
-      },
-
-      // ─── KPI counts ───────────────────────────────────────────────────────────
-      //   Count entries in ZC_CONF_REQ_H by EnvId — no status filter.
-
-      _refreshKpi: async function () {
-        const sCount = _BASE_URL + "ZC_CONF_REQ_H/$count";
-        const oH     = { "Accept": "text/plain", "X-Requested-With": "XMLHttpRequest" };
-        const _get   = function (url) {
-          return fetch(url, { headers: oH })
-            .then(function (r) { return r.ok ? r.text() : "0"; })
-            .catch(function () { return "0"; });
-        };
-        try {
-          const [sAtDev, sAtQas, sAtPrd, sTotal] = await Promise.all([
-            _get(sCount + "?$filter=EnvId%20eq%20'DEV'"),
-            _get(sCount + "?$filter=EnvId%20eq%20'QAS'"),
-            _get(sCount + "?$filter=EnvId%20eq%20'PRD'"),
-            _get(sCount),
-          ]);
-          this.getView().getModel("kpi").setData({
-            atDev:  parseInt(sAtDev,  10) || 0,
-            atQas:  parseInt(sAtQas,  10) || 0,
-            atPrd:  parseInt(sAtPrd,  10) || 0,
-            total:  parseInt(sTotal,  10) || 0,
-          });
-        } catch (e) {
-          console.warn("KPI refresh failed:", e);
         }
       },
 
@@ -500,7 +481,6 @@ sap.ui.define(
                   "com.sap.gateway.srvd.zsd_conf_req.v0001.rollback(...)", oCtx
                 ).execute("$auto");
                 this._loadRequests();
-                this._refreshKpi();
                 MessageBox.success("Đã rollback thành công — ENV: " + sEnvId + ".");
               } catch (e) {
                 console.error(e);
@@ -544,7 +524,6 @@ sap.ui.define(
                   "com.sap.gateway.srvd.zsd_conf_req.v0001.promote(...)", oCtx
                 ).execute("$auto");
                 this._loadRequests();
-                this._refreshKpi();
                 MessageBox.success("Đã promote thành công lên " + sNextEnv + ".");
               } catch (e) {
                 console.error(e);
@@ -567,7 +546,6 @@ sap.ui.define(
 
       onRefresh: function () {
         this._loadRequests();
-        this._refreshKpi();
         MessageToast.show("Refreshed");
       },
 

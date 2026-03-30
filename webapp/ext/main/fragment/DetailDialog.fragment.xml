@@ -6,16 +6,16 @@
 
     <Dialog id="detailDialog"
             title="Configuration Detail — REQ_ID: {detail>/reqId}"
-            contentWidth="60rem" contentHeight="44rem"
-            verticalScrolling="false" draggable="true" resizable="true">
+            contentWidth="64rem" contentHeight="54rem"
+            verticalScrolling="true" draggable="true" resizable="true">
 
         <content>
             <VBox class="sapUiSmallMargin">
 
-                <!-- Request Info -->
+                <!-- ── Request Info ──────────────────────────────────────── -->
                 <Panel headerText="Request Info" expandable="false" class="sapUiTinyMarginBottom">
                     <HBox wrap="Wrap" class="sapUiSmallMargin" alignItems="Start">
-                        <VBox class="sapUiSmallMarginEnd" width="14rem">
+                        <VBox class="sapUiSmallMarginEnd" width="7rem">
                             <Label text="Module" design="Bold"/>
                             <Text text="{detail>/module}"/>
                         </VBox>
@@ -24,7 +24,7 @@
                             <Text text="{detail>/confName}"/>
                         </VBox>
                         <VBox class="sapUiSmallMarginEnd" width="10rem">
-                            <Label text="By" design="Bold"/>
+                            <Label text="Requested By" design="Bold"/>
                             <Text text="{detail>/by}"/>
                         </VBox>
                         <VBox width="auto">
@@ -34,13 +34,69 @@
                     </HBox>
                 </Panel>
 
-                <!-- Preview thay đổi -->
-                <Panel headerText="Preview thay đổi" expandable="false" class="sapUiTinyMarginBottom">
+                <!-- ── Promote Journey Timeline ─────────────────────────── -->
+                <Panel headerText="Promote Journey" expandable="true" expanded="true"
+                    class="sapUiTinyMarginBottom">
+                    <VBox class="sapUiSmallMargin">
+                        <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                            <!-- DEV step -->
+                            <VBox alignItems="Center" width="6rem">
+                                <core:Icon
+                                    src="{= ${detail>envId} === 'DEV' ? 'sap-icon://circle-task-2' : 'sap-icon://accept'}"
+                                    color="{= ${detail>envId} === 'DEV' ? '#0070F2' : '#107E3E'}"
+                                    size="1.5rem"
+                                    visible="{= !!${detail>/journey}.length}"/>
+                                <Text text="DEV" textAlign="Center"/>
+                            </VBox>
+                        </HBox>
+                        <List id="journeyList"
+                            items="{detail>/journey}"
+                            noDataText="Chưa có dữ liệu journey."
+                            showNoData="true"
+                            showSeparators="Inner">
+                            <CustomListItem>
+                                <HBox alignItems="Center" class="sapUiSmallPadding">
+                                    <!-- Step icon -->
+                                    <core:Icon
+                                        src="{= ${detail>isCurrent} ? 'sap-icon://circle-task-2' : 'sap-icon://accept'}"
+                                        color="{= ${detail>isCurrent} ? '#0070F2' : '#107E3E'}"
+                                        size="1.2rem"
+                                        class="sapUiSmallMarginEnd"/>
+                                    <!-- ENV badge -->
+                                    <ObjectStatus
+                                        text="{detail>envId}"
+                                        state="{= ${detail>envId} === 'PRD' ? 'Error' :
+                                                   ${detail>envId} === 'QAS' ? 'Warning' : 'Information'}"
+                                        class="sapUiSmallMarginEnd"/>
+                                    <VBox>
+                                        <Text text="{= ${detail>isCurrent} ? '(Current)' : 'Promoted'}"/>
+                                        <Text text="{= 'By: ' + ${detail>by} + '  |  ' + ${detail>at}}"
+                                            class="sapUiTinyMarginTop"/>
+                                    </VBox>
+                                    <ToolbarSpacer/>
+                                    <!-- Status badge -->
+                                    <ObjectStatus
+                                        text="{= ${detail>status} === 'ACTIVE'      ? 'Active'      :
+                                                  ${detail>status} === 'ROLLED_BACK' ? 'Rolled Back' :
+                                                  ${detail>status} === 'PROMOTED'    ? 'Promoted'    : ${detail>status}}"
+                                        state="{= ${detail>status} === 'ACTIVE'      ? 'Success' :
+                                                   ${detail>status} === 'ROLLED_BACK' ? 'Error'   :
+                                                   ${detail>status} === 'PROMOTED'    ? 'Warning' : 'None'}"/>
+                                </HBox>
+                            </CustomListItem>
+                        </List>
+                    </VBox>
+                </Panel>
+
+                <!-- ── Preview thay đổi ──────────────────────────────────── -->
+                <Panel headerText="Preview thay đổi" expandable="true" expanded="true"
+                    class="sapUiTinyMarginBottom">
                     <Table id="previewTable" inset="false"
                            noDataText="Loading..."
                            items="{detail>/lines}">
                         <columns>
-                            <Column width="10rem"><Text text="Field"/></Column>
+                            <Column width="12rem"><Text text="Key Info"/></Column>
+                            <Column width="9rem"><Text text="Field"/></Column>
                             <Column><Text text="Giá trị cũ"/></Column>
                             <Column><Text text="Giá trị mới"/></Column>
                             <Column width="9rem" hAlign="Center"><Text text="Thay đổi"/></Column>
@@ -48,13 +104,15 @@
                         <items>
                             <ColumnListItem>
                                 <cells>
+                                    <Text text="{detail>keyInfo}"/>
                                     <Text text="{detail>field}"/>
                                     <Text text="{detail>oldVal}"/>
-                                    <Text text="{detail>newVal}"/>
+                                    <Text text="{= ${detail>changed} ? ${detail>newVal} : ${detail>newVal}}"
+                                        class="{= ${detail>changed} ? 'sapThemePositiveText' : ''}"/>
                                     <HBox alignItems="Center" justifyContent="Center">
                                         <core:Icon
                                             src="sap-icon://arrow-left"
-                                            color="{= ${detail>changed} ? '#BB0000' : 'Default'}"
+                                            color="#BB0000"
                                             visible="{detail>changed}"
                                             size="0.75rem"
                                             class="sapUiTinyMarginEnd"/>
@@ -67,7 +125,6 @@
                         </items>
                     </Table>
                 </Panel>
-
 
             </VBox>
         </content>
