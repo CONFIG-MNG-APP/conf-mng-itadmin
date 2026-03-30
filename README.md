@@ -4,9 +4,7 @@ SAP Fiori custom application for IT Administrators to **promote** and **rollback
 
 ## Live URL
 
-**System:** https://s40lp1.ucc.cit.tum.de/sap/bc/ui5_ui5/sap/zconfmngadmin/index.html
-**Fiori Launchpad:** https://s40lp1.ucc.cit.tum.de/sap/bc/ui2/flp?sap-client=324#ITAdmin-manage
-**Client:** 324 | **ABAP Package:** `ZGSP26SAP06` | **Transport:** `S40K908611`
+https://s40lp1.ucc.cit.tum.de/sap/bc/ui5_ui5/sap/zconfmngadmin?sap-client=324
 
 ---
 
