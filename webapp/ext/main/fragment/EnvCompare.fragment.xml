@@ -46,7 +46,7 @@
                             press=".onEnvCompareRun" class="sapUiTinyMarginBottom"/>
                 </HBox>
 
-                <core:HTML content="&lt;hr style='border:none;border-top:1px solid #e5e5e5;margin:0.25rem 0 0.5rem'/&gt;"/>
+                <HBox class="sapUiMediumMarginBottom"/>
 
                 <!-- Result Table -->
                 <Table inset="false"

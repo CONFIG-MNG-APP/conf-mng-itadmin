@@ -3,12 +3,10 @@ sap.ui.define(
     "sap/ui/core/mvc/Controller",
     "sap/m/MessageToast",
     "sap/m/MessageBox",
-    "sap/ui/model/Filter",
-    "sap/ui/model/FilterOperator",
     "sap/ui/core/Fragment",
     "sap/ui/model/json/JSONModel",
   ],
-  function (Controller, MessageToast, MessageBox, Filter, FilterOperator, Fragment, JSONModel) {
+  function (Controller, MessageToast, MessageBox, Fragment, JSONModel) {
     "use strict";
 
     // ─── OData service base URL ───────────────────────────────────────────────
@@ -39,28 +37,24 @@ sap.ui.define(
         entityKey: "ItemId",
         keyFields:  ["PlantId", "MatGroup"],
         diffFields: [
-          { field: "PlantId",  old: "OldPlantId"  },
-          { field: "MatGroup", old: "OldMatGroup" },
-          { field: "MinQty",   old: "OldMinQty"   },
+          { field: "MinQty", old: "OldMinQty" },
         ],
       },
       FI: {
         label: "FI Limit",
         url:    "/sap/opu/odata4/sap/zui_fi_limit_conf/srvd/sap/zsd_fi_limit_conf/0001/FILimitMain",
-        reqUrl: "/sap/opu/odata4/sap/zui_fi_limit_conf/srvd/sap/zsd_fi_limit_conf/0001/ZC_FI_LIMIT_CONF",
+        reqUrl: "/sap/opu/odata4/sap/zui_fi_limit_conf/srvd/sap/zsd_fi_limit_conf/0001/FILimitConf",
         entityKey: "ItemId",
         keyFields:  ["ExpenseType", "GlAccount"],
         diffFields: [
-          { field: "ExpenseType", old: "OldExpenseType" },
-          { field: "GlAccount",   old: "OldGlAccount"   },
           { field: "AutoApprLim", old: "OldAutoApprLim" },
           { field: "Currency",    old: "OldCurrency"    },
         ],
       },
       SD: {
         label: "SD Price",
-        url:    "/sap/opu/odata4/sap/zui_sd_price_conf/srvd/sap/zsd_sd_price_conf/0001/SDPriceMain",
-        reqUrl: "/sap/opu/odata4/sap/zui_sd_price_conf/srvd/sap/zsd_sd_price_conf/0001/SDPriceConf",
+        url:    "/sap/opu/odata4/sap/zsd_sd_price_conf/srvd/sap/zsd_sd_price_conf/0001/SDPriceMain",
+        reqUrl: "/sap/opu/odata4/sap/zsd_sd_price_conf/srvd/sap/zsd_sd_price_conf/0001/SDPriceConf",
         entityKey: "ItemId",
         keyFields:  ["BranchId", "CustGroup", "MaterialGrp"],
         diffFields: [
@@ -73,6 +67,27 @@ sap.ui.define(
         ],
       },
     };
+
+    function _buildJourneyNodes(aJourney) {
+      const oMap = {};
+      aJourney.forEach(function (j) { oMap[j.envId] = j; });
+      function _node(sEnv) {
+        const j = oMap[sEnv];
+        if (!j) return { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" };
+        let sDisplay = j.status, sState = "None";
+        if      (j.status === "ACTIVE")       { sDisplay = "Active";      sState = "Success"; }
+        else if (j.status === "PROMOTED")     { sDisplay = "Promoted";    sState = "Warning"; }
+        else if (j.status === "ROLLED_BACK")  { sDisplay = "Rolled Back"; sState = "Error";   }
+        return {
+          exists: true,
+          current: j.isCurrent,
+          label: j.isCurrent ? "(Current)" : "Done",
+          by: j.by, at: j.at,
+          status: sDisplay, statusState: sState,
+        };
+      }
+      return { dev: _node("DEV"), qas: _node("QAS"), prd: _node("PRD") };
+    }
 
     function _getNextEnv(sEnv) {
       return sEnv === "DEV" ? "QAS" : sEnv === "QAS" ? "PRD" : null;
@@ -93,15 +108,195 @@ sap.ui.define(
       // ─── Lifecycle ────────────────────────────────────────────────────────────
 
       onInit: function () {
+        this._sSelectedModule = "MM";
+        this._oVersionData    = {};
+        this._oReqModuleMap   = {};
         this.getView().setModel(
-          new JSONModel({ atDev: 0, atQas: 0, atPrd: 0, total: 0 }),
+          new JSONModel({
+            atDev: 0, atQas: 0, atPrd: 0, total: 0,
+            mmCount: 0, mmssCount: 0, fiCount: 0, sdCount: 0,
+            selectedModule: "MM", selectedLabel: _SERVICES["MM"].label, selectedVer: "-",
+            isAuditMode: false,
+          }),
           "kpi"
         );
         this.getView().setModel(
-          new JSONModel({ requests: [] }),
+          new JSONModel({ requests: [], auditEntries: [], auditDisplay: [] }),
           "vm"
         );
+        this.getView().setModel(
+          new JSONModel({ count: 0, items: [] }),
+          "notif"
+        );
+        // Load danh sách đã đọc từ localStorage
+        try {
+          this._oSeenNotifs = new Set(JSON.parse(localStorage.getItem("itadmin_seen_notifs") || "[]"));
+        } catch (e) { this._oSeenNotifs = new Set(); }
+
         this._loadRequests();
+        this._loadModuleVersions();
+        this._startNotifPolling();
+      },
+
+      onExit: function () {
+        if (this._iNotifTimer) { clearInterval(this._iNotifTimer); }
+      },
+
+      // ─── Notification polling ─────────────────────────────────────────────────
+
+      _startNotifPolling: function () {
+        this._pollNotifications();
+        this._iNotifTimer = setInterval(this._pollNotifications.bind(this), 60000); // 60s
+      },
+
+      _pollNotifications: async function () {
+        try {
+          // Fetch tất cả req có Status='ACTIVE' (manager đã approve)
+          // Chỉ bắt req vừa được manager duyệt ở DEV (chưa promote).
+          // Khi promote lên QAS/PRD cũng tạo record ACTIVE nhưng EnvId != DEV → không bắt.
+          const sUrl = _BASE_URL + "ZC_CONF_REQ_H" +
+            "?$filter=" + encodeURIComponent("Status eq 'ACTIVE' and EnvId eq 'DEV'") +
+            "&$select=ReqId,EnvId,ReqTitle,CreatedBy,CreatedAt&$top=200&$orderby=CreatedAt desc";
+          const oResp = await fetch(sUrl, { headers: _FETCH_HDR });
+          if (!oResp.ok) return;
+          const aAll = (await oResp.json()).value || [];
+
+          // Chỉ lấy những item chưa đọc
+          const aNew = aAll.filter((h) => !this._oSeenNotifs.has(h.ReqId + "|" + h.EnvId));
+
+          const oMap = this._oReqModuleMap;
+          this.getView().getModel("notif").setData({
+            count: aNew.length,
+            items: aNew.map(function (h) {
+              const sMod = oMap[h.ReqId] || "";
+              return {
+                key:         h.ReqId + "|" + h.EnvId,
+                reqId:       h.ReqId,
+                envId:       h.EnvId,
+                moduleId:    sMod,
+                moduleLabel: sMod && _SERVICES[sMod] ? _SERVICES[sMod].label : "",
+                title:       h.ReqTitle || h.ReqId,
+                description: "Đã được duyệt — ENV: " + (h.EnvId || "-"),
+                by:          h.CreatedBy || "-",
+                at:          _formatDate(h.CreatedAt),
+              };
+            }),
+          });
+        } catch (e) { console.warn("Notif poll failed:", e); }
+      },
+
+      // ─── Notification handlers ────────────────────────────────────────────────
+
+      onNotifBellPress: function (oEvent) {
+        const oButton = oEvent.getSource();
+        if (!this._oNotifPopover) {
+          Fragment.load({
+            id:         this.getView().getId(),
+            name:       "zgsp26.conf.mng.itadmin.ext.main.fragment.NotifPopover",
+            controller: this,
+          }).then((oPopover) => {
+            this._oNotifPopover = oPopover;
+            this.getView().addDependent(oPopover);
+            oPopover.openBy(oButton);
+          });
+        } else {
+          this._oNotifPopover.openBy(oButton);
+        }
+      },
+
+      onNotifItemPress: function (oEvent) {
+        const oItem = oEvent.getSource().getBindingContext("notif").getObject();
+        this._markNotifRead(oItem.key);
+        if (this._oNotifPopover) { this._oNotifPopover.close(); }
+      },
+
+      onNotifItemClose: function (oEvent) {
+        const oItem = oEvent.getSource().getBindingContext("notif").getObject();
+        this._markNotifRead(oItem.key);
+      },
+
+      onNotifMarkAllRead: function () {
+        const aItems = this.getView().getModel("notif").getProperty("/items") || [];
+        aItems.forEach((i) => this._oSeenNotifs.add(i.key));
+        this._saveSeenNotifs();
+        this.getView().getModel("notif").setData({ count: 0, items: [] });
+        if (this._oNotifPopover) { this._oNotifPopover.close(); }
+      },
+
+      onNotifGoToModule: function (oEvent) {
+        const oItem = oEvent.getSource().getParent().getBindingContext("notif").getObject();
+        const sMod  = oItem.moduleId;
+        if (!sMod || !_SERVICES[sMod]) {
+          MessageToast.show("Không xác định được module của request này.");
+          return;
+        }
+        // Chuyển sang tab module tương ứng
+        this._sSelectedModule = sMod;
+        this.byId("moduleTabBar").setSelectedKey(sMod);
+        const oKpi = this.getView().getModel("kpi");
+        oKpi.setProperty("/isAuditMode",   false);
+        oKpi.setProperty("/selectedModule", sMod);
+        oKpi.setProperty("/selectedLabel",  _SERVICES[sMod].label);
+        const vNo = this._oVersionData[sMod];
+        oKpi.setProperty("/selectedVer", vNo != null ? "v." + vNo : "-");
+        this._loadRequests();
+        this._markNotifRead(oItem.key);
+        if (this._oNotifPopover) { this._oNotifPopover.close(); }
+      },
+
+      _markNotifRead: function (sKey) {
+        this._oSeenNotifs.add(sKey);
+        this._saveSeenNotifs();
+        const oNotif = this.getView().getModel("notif");
+        const aItems = (oNotif.getProperty("/items") || []).filter((i) => i.key !== sKey);
+        oNotif.setProperty("/items", aItems);
+        oNotif.setProperty("/count", aItems.length);
+      },
+
+      _saveSeenNotifs: function () {
+        try {
+          // Giữ tối đa 500 entries gần nhất để tránh localStorage overflow
+          const aEntries = [...this._oSeenNotifs];
+          if (aEntries.length > 500) {
+            const aPruned = aEntries.slice(aEntries.length - 500);
+            this._oSeenNotifs = new Set(aPruned);
+          }
+          localStorage.setItem("itadmin_seen_notifs", JSON.stringify([...this._oSeenNotifs]));
+        } catch (e) { /* ignore */ }
+      },
+
+      // ─── Module versions ──────────────────────────────────────────────────────
+      //   Version của mỗi module = số lần config của module đó bị thay đổi
+      //   tại mỗi env (promote hoặc rollback đều tính là +1 version).
+      //
+      //   Cách tính:
+      //     1. Fetch reqUrl của từng module → map ReqId → ModuleId
+      //     2. Fetch toàn bộ ZC_CONF_REQ_H (select ReqId, EnvId)
+      //     3. Đếm số records per (ModuleId, EnvId) → đó là version
+
+      _loadModuleVersions: async function () {
+        // Chỉ build ReqId → ModuleId map cho notification polling.
+        // Version strip được tính từ max VersionNo trong _loadRequests.
+        try {
+          const oReqModuleMap = {};
+          this._oReqModuleMap = oReqModuleMap;
+          await Promise.all(Object.keys(_SERVICES).map(async function (sKey) {
+            try {
+              const oResp = await fetch(
+                _SERVICES[sKey].reqUrl + "?$select=ReqId&$top=5000",
+                { headers: _FETCH_HDR }
+              );
+              if (!oResp.ok) return;
+              ((await oResp.json()).value || []).forEach(function (item) {
+                if (item.ReqId && !oReqModuleMap[item.ReqId]) {
+                  oReqModuleMap[item.ReqId] = sKey;
+                }
+              });
+            } catch (e) { console.warn("Version map " + sKey, e); }
+          }));
+        } catch (e) {
+          console.warn("_loadModuleVersions failed:", e);
+        }
       },
 
       // ─── Load + deduplicate requests ─────────────────────────────────────────
@@ -116,11 +311,13 @@ sap.ui.define(
         const oView = this.getView();
         oView.setBusy(true);
 
-        const sModule = this.byId("moduleFilter").getSelectedKey();
+        const sModule = this._sSelectedModule || "";
         const oDate   = this.byId("dateFilter");
         const dFrom   = oDate.getDateValue();
         const dTo     = oDate.getSecondDateValue();
-        const aModuleKeys = sModule ? [sModule] : Object.keys(_SERVICES);
+        // Always fetch ALL modules so KPI counts are always accurate.
+        // Module tab filter is applied client-side after KPI computation.
+        const aModuleKeys = Object.keys(_SERVICES);
 
         try {
           // ── Step 1: module config tables ────────────────────────────────────
@@ -138,7 +335,12 @@ sap.ui.define(
               return aItems.map(function (item) {
                 const sKeyInfo = oSvc.keyFields
                   .map(function (f) { return item[f] || "-"; }).join(" / ");
-                return Object.assign({ ModuleId: sKey, _keyInfo: sKeyInfo }, item);
+                return Object.assign({
+                  ModuleId: sKey,
+                  _keyInfo: sKeyInfo,
+                  _createdAtFmt: _formatDate(item.CreatedAt),
+                  _versionDisplay: item.VersionNo != null ? "v." + item.VersionNo : "-",
+                }, item);
               });
             } catch (e) {
               console.warn("Fetch " + sKey + " failed:", e);
@@ -150,12 +352,14 @@ sap.ui.define(
             return acc.concat(a);
           }, []);
 
-          // One representative item per ReqId (keep highest module-table EnvId if exists)
+          // One representative item per (ReqId + Module) — cross-module dedup would
+          // incorrectly drop records when the same ReqId exists in multiple modules.
           const oMap = {};
           aAll.forEach(function (item) {
-            const existing = oMap[item.ReqId];
+            const sKey = item.ReqId + "|" + item.ModuleId;
+            const existing = oMap[sKey];
             if (!existing || (_ENV_ORDER[item.EnvId] || 0) > (_ENV_ORDER[existing.EnvId] || 0)) {
-              oMap[item.ReqId] = item;
+              oMap[sKey] = item;
             }
           });
 
@@ -170,15 +374,15 @@ sap.ui.define(
                 // Highest EnvId per ReqId from header table
                 const oEnvMap = {};
                 aHdrs.forEach(function (h) {
-                  if (!oMap[h.ReqId]) return;
                   const cur = oEnvMap[h.ReqId];
                   if (!cur || (_ENV_ORDER[h.EnvId] || 0) > (_ENV_ORDER[cur] || 0)) {
                     oEnvMap[h.ReqId] = h.EnvId;
                   }
                 });
-                // Override module-table EnvId with the real promote position
-                Object.keys(oMap).forEach(function (sReqId) {
-                  if (oEnvMap[sReqId]) oMap[sReqId].EnvId = oEnvMap[sReqId];
+                // Override EnvId for all (ReqId|Module) entries that have a header record
+                Object.keys(oMap).forEach(function (sMapKey) {
+                  const sReqId = oMap[sMapKey].ReqId;
+                  if (oEnvMap[sReqId]) oMap[sMapKey].EnvId = oEnvMap[sReqId];
                 });
               }
             } catch (e) {
@@ -190,17 +394,41 @@ sap.ui.define(
           const aDeduped = Object.values(oMap).filter(function (i) { return !!i.ReqId; });
 
           // ── KPI: đếm unique ReqId giống list (trước khi apply ENV/search filter) ──
-          this.getView().getModel("kpi").setData({
-            atDev:  aDeduped.filter(function (i) { return i.EnvId === "DEV"; }).length,
-            atQas:  aDeduped.filter(function (i) { return i.EnvId === "QAS"; }).length,
-            atPrd:  aDeduped.filter(function (i) { return i.EnvId === "PRD"; }).length,
-            total:  aDeduped.length,
+          // Dùng setProperty thay vì setData để không xóa các field khác
+          // (selectedModule, selectedVerDev/Qas/Prd, isAuditMode, ...)
+          const oKpiModel = this.getView().getModel("kpi");
+          oKpiModel.setProperty("/atDev",     aDeduped.filter(function (i) { return i.EnvId    === "DEV";  }).length);
+          oKpiModel.setProperty("/atQas",     aDeduped.filter(function (i) { return i.EnvId    === "QAS";  }).length);
+          oKpiModel.setProperty("/atPrd",     aDeduped.filter(function (i) { return i.EnvId    === "PRD";  }).length);
+          oKpiModel.setProperty("/total",     aDeduped.length);
+          oKpiModel.setProperty("/mmCount",   aDeduped.filter(function (i) { return i.ModuleId === "MM";   }).length);
+          oKpiModel.setProperty("/mmssCount", aDeduped.filter(function (i) { return i.ModuleId === "MMSS"; }).length);
+          oKpiModel.setProperty("/fiCount",   aDeduped.filter(function (i) { return i.ModuleId === "FI";   }).length);
+          oKpiModel.setProperty("/sdCount",   aDeduped.filter(function (i) { return i.ModuleId === "SD";   }).length);
+
+          // ── Max VersionNo per module → cập nhật version strip ──────────────
+          const oMaxVer = {};
+          Object.keys(_SERVICES).forEach(function (sKey) { oMaxVer[sKey] = 0; });
+          aDeduped.forEach(function (i) {
+            if (i.ModuleId && (i.VersionNo || 0) > (oMaxVer[i.ModuleId] || 0)) {
+              oMaxVer[i.ModuleId] = i.VersionNo || 0;
+            }
           });
+          this._oVersionData = oMaxVer;
+          if (sModule && _SERVICES[sModule]) {
+            const vNo = oMaxVer[sModule];
+            oKpiModel.setProperty("/selectedVer", vNo != null ? "v." + vNo : "-");
+          }
 
           let aResult = aDeduped.slice();
 
+          // Client-side: Module tab filter
+          if (sModule) {
+            aResult = aResult.filter(function (i) { return i.ModuleId === sModule; });
+          }
+
           // Client-side: ENV filter (uses overridden EnvId)
-          const sEnv = this.byId("envFilter").getSelectedKey();
+          const sEnv = this.byId("envSegment").getSelectedKey();
           if (sEnv) {
             aResult = aResult.filter(function (i) { return i.EnvId === sEnv; });
           }
@@ -215,6 +443,7 @@ sap.ui.define(
             });
           }
 
+          aResult.sort(function (a, b) { return (b.VersionNo || 0) - (a.VersionNo || 0); });
           this.getView().getModel("vm").setProperty("/requests", aResult);
         } catch (e) {
           console.error("_loadRequests failed:", e);
@@ -235,12 +464,144 @@ sap.ui.define(
       },
 
       onClearFilter: function () {
-        this.byId("moduleFilter").setSelectedKey("");
-        this.byId("envFilter").setSelectedKey("");
+        this._sSelectedModule = "MM";
+        this.byId("moduleTabBar").setSelectedKey("MM");
+        this.byId("envSegment").setSelectedKey("");
         this.byId("dateFilter").setValue("");
         this.byId("searchField").setValue("");
+        const oKpi = this.getView().getModel("kpi");
+        oKpi.setProperty("/isAuditMode", false);
+        oKpi.setProperty("/selectedModule", "MM");
+        oKpi.setProperty("/selectedLabel",  _SERVICES["MM"].label);
+        const vNo = this._oVersionData["MM"];
+        oKpi.setProperty("/selectedVer", vNo != null ? "v." + vNo : "-");
         this._loadRequests();
       },
+
+      onTabSelect: function (oEvent) {
+        const sKey = oEvent.getParameter("key");
+        const oKpi = this.getView().getModel("kpi");
+
+        if (sKey === "AUDIT") {
+          oKpi.setProperty("/isAuditMode", true);
+          oKpi.setProperty("/selectedModule", "");
+          this._sSelectedModule = "";
+          this._loadAuditTrail();
+          return;
+        }
+
+        oKpi.setProperty("/isAuditMode", false);
+        this._sSelectedModule = sKey;
+
+        if (this._sSelectedModule) {
+          const vNo = this._oVersionData[this._sSelectedModule];
+          oKpi.setProperty("/selectedModule", this._sSelectedModule);
+          oKpi.setProperty("/selectedLabel",  _SERVICES[this._sSelectedModule].label);
+          oKpi.setProperty("/selectedVer",    vNo != null ? "v." + vNo : "-");
+        } else {
+          oKpi.setProperty("/selectedModule", "");
+        }
+
+        this._loadRequests();
+      },
+
+      // ─── Audit Trail ──────────────────────────────────────────────────────────
+
+      _loadAuditTrail: async function () {
+        const oView = this.getView();
+        oView.setBusy(true);
+        try {
+          // Step 1: ReqId → {moduleId, versionNo} từ bảng chính (url) của từng module
+          // Dùng url (main table) thay vì reqUrl (req table) vì reqUrl luôn có VersionNo=1
+          const oReqMap = {};
+          const aModFetches = Object.keys(_SERVICES).map(async function (sKey) {
+            try {
+              const oResp = await fetch(
+                _SERVICES[sKey].url + "?$select=ReqId,VersionNo&$top=5000",
+                { headers: _FETCH_HDR }
+              );
+              if (!oResp.ok) return;
+              ((await oResp.json()).value || []).forEach(function (item) {
+                if (!item.ReqId) return;
+                const cur = oReqMap[item.ReqId];
+                if (!cur || (item.VersionNo || 0) > (cur.versionNo || 0)) {
+                  oReqMap[item.ReqId] = { moduleId: sKey, versionNo: item.VersionNo || 0 };
+                }
+              });
+            } catch (e) { console.warn("Audit module " + sKey, e); }
+          });
+          await Promise.all(aModFetches);
+
+          // Step 2: toàn bộ ZC_CONF_REQ_H (all statuses, sort mới nhất lên trước)
+          const sUrl = _BASE_URL + "ZC_CONF_REQ_H" +
+            "?$select=ReqId,EnvId,Status,CreatedBy,CreatedAt,ReqTitle" +
+            "&$orderby=CreatedAt desc&$top=2000";
+          const oResp = await fetch(sUrl, { headers: _FETCH_HDR });
+          if (!oResp.ok) throw new Error("ZC_CONF_REQ_H fetch failed");
+          const aHdrs = (await oResp.json()).value || [];
+
+          // Step 3: join + map sang audit entries
+          const aAudit = aHdrs.map(function (h) {
+            const oMod = oReqMap[h.ReqId] || {};
+            return {
+              reqId:     h.ReqId      || "-",
+              envId:     h.EnvId      || "-",
+              status:    h.Status     || "-",
+              createdBy: h.CreatedBy  || "-",
+              createdAt: _formatDate(h.CreatedAt),
+              reqTitle:  h.ReqTitle   || "-",
+              moduleId:  oMod.moduleId  || "?",
+              versionNo: oMod.versionNo != null ? "v." + oMod.versionNo : "-",
+            };
+          });
+
+          this.getView().getModel("vm").setProperty("/auditEntries", aAudit);
+          this._applyAuditFilters();
+        } catch (e) {
+          console.error(e);
+          MessageBox.error("Không thể tải Audit Trail: " + (e.message || e));
+        } finally {
+          oView.setBusy(false);
+        }
+      },
+
+      _applyAuditFilters: function () {
+        const aAll = this.getView().getModel("vm").getProperty("/auditEntries") || [];
+        let aResult = aAll.slice();
+
+        const sModule = this.byId("auditModuleFilter").getSelectedKey();
+        if (sModule) aResult = aResult.filter(function (i) { return i.moduleId === sModule; });
+
+        const sEnv = this.byId("auditEnvFilter").getSelectedKey();
+        if (sEnv) aResult = aResult.filter(function (i) { return i.envId === sEnv; });
+
+        const sStatus = this.byId("auditStatusFilter").getSelectedKey();
+        if (sStatus) aResult = aResult.filter(function (i) { return i.status === sStatus; });
+
+        const sQuery = (this.byId("auditSearch").getValue() || "").toLowerCase();
+        if (sQuery) {
+          aResult = aResult.filter(function (i) {
+            return (i.reqId    || "").toLowerCase().includes(sQuery) ||
+                   (i.createdBy|| "").toLowerCase().includes(sQuery) ||
+                   (i.reqTitle || "").toLowerCase().includes(sQuery);
+          });
+        }
+
+        this.getView().getModel("vm").setProperty("/auditDisplay", aResult);
+      },
+
+      onAuditFilter: function () { this._applyAuditFilters(); },
+      onAuditSearch: function () { this._applyAuditFilters(); },
+
+      onAuditClearFilter: function () {
+        this.byId("auditModuleFilter").setSelectedKey("");
+        this.byId("auditEnvFilter").setSelectedKey("");
+        this.byId("auditStatusFilter").setSelectedKey("");
+        this.byId("auditSearch").setValue("");
+        this._applyAuditFilters();
+      },
+
+      onAuditRefresh: function () { this._loadAuditTrail(); },
 
       // ─── Row action → open dialog ─────────────────────────────────────────────
 
@@ -255,7 +616,7 @@ sap.ui.define(
 
       // ─── Detail dialog ────────────────────────────────────────────────────────
 
-      _openDetailDialog: async function (oItem, bIsPromote) {
+      _openDetailDialog: async function (oItem, bIsPromote, bAutoRollback) {
         const sReqId   = oItem.ReqId;
         const sModule  = oItem.ModuleId;
         const sCurEnv  = oItem.EnvId  || "DEV";
@@ -271,7 +632,7 @@ sap.ui.define(
             new JSONModel({
               reqId: "", module: "", confName: "", by: "", reason: "",
               curEnv: "", nextEnv: "",
-              isPromoteMode: false, isRollbackMode: false,
+              isPromoteMode: false, isRollbackMode: false, promoteEnabled: false,
               lines: [], journey: [],
             }),
             "detail"
@@ -289,9 +650,15 @@ sap.ui.define(
           reason:   "-",
           curEnv:   sCurEnv,
           nextEnv:  sNextEnv,
-          isPromoteMode:  !!bIsPromote,
-          isRollbackMode: sCurEnv === "PRD",
-          lines: [], journey: [],
+          isPromoteMode:       !!bIsPromote,
+          promoteEnabled:      false,
+          showRollbackConfirm: !!bAutoRollback,
+          rollbackTargetEnv:   bAutoRollback ? sCurEnv : "",
+          lines: [], linesDisplay: [], journey: [],
+          showChangedOnly: false,
+          devNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
+          qasNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
+          prdNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
         });
 
         this.byId("previewTable").setNoDataText("Loading config changes...");
@@ -303,22 +670,40 @@ sap.ui.define(
           this._fetchReqHeader(sReqId, sCurEnv),
         ]).then(([aLines, aJourney, oHeader]) => {
           const oModel = this._oDetailDialog.getModel("detail");
-          oModel.setProperty("/lines",    aLines);
-          oModel.setProperty("/journey",  aJourney);
+          oModel.setProperty("/lines",   aLines);
+          oModel.setProperty("/journey", aJourney);
+
+          // Build journey stepper nodes
+          const oNodes = _buildJourneyNodes(aJourney);
+          oModel.setProperty("/devNode", oNodes.dev);
+          oModel.setProperty("/qasNode", oNodes.qas);
+          oModel.setProperty("/prdNode", oNodes.prd);
+
+          // Apply changed-only filter if active
+          const bFilter = oModel.getProperty("/showChangedOnly");
+          oModel.setProperty("/linesDisplay", bFilter
+            ? aLines.filter(function (l) { return l.changed; })
+            : aLines
+          );
+
           if (oHeader.ReqTitle)  oModel.setProperty("/confName", oHeader.ReqTitle);
           if (oHeader.Reason)    oModel.setProperty("/reason",   oHeader.Reason);
           if (oHeader.CreatedBy) oModel.setProperty("/by",       oHeader.CreatedBy);
           this.byId("previewTable").setNoDataText(
             aLines.length ? "" : "Không có thay đổi nào."
           );
-        }).catch(function (e) { console.error(e); });
+          oModel.setProperty("/promoteEnabled", true);
+        }).catch((e) => {
+          console.error(e);
+          this.byId("previewTable").setNoDataText("Lỗi tải dữ liệu — vui lòng đóng và thử lại.");
+        });
       },
 
       // ─── Promote journey (all envs of same ReqId) ─────────────────────────────
 
       _fetchJourney: async function (sReqId, sCurrentEnv) {
         const sUrl = _BASE_URL + "ZC_CONF_REQ_H" +
-          "?$filter=" + encodeURIComponent("ReqId eq '" + sReqId + "'") +
+          "?$filter=" + encodeURIComponent("ReqId eq " + sReqId) +
           "&$select=EnvId,Status,CreatedBy,CreatedAt&$top=10";
         try {
           const oResp = await fetch(sUrl, { headers: _FETCH_HDR });
@@ -344,7 +729,7 @@ sap.ui.define(
 
       _fetchReqHeader: async function (sReqId, sEnvId) {
         const sUrl = _BASE_URL + "ZC_CONF_REQ_H" +
-          "?$filter=" + encodeURIComponent("ReqId eq '" + sReqId + "' and EnvId eq '" + sEnvId + "'") +
+          "?$filter=" + encodeURIComponent("ReqId eq " + sReqId + " and EnvId eq '" + sEnvId + "'") +
           "&$select=ReqTitle,Reason,CreatedBy&$top=1";
         try {
           const oResp = await fetch(sUrl, { headers: _FETCH_HDR });
@@ -365,7 +750,7 @@ sap.ui.define(
           const oSvc = _SERVICES[sKey];
           if (!oSvc) continue;
           try {
-            const oResp = await fetch(oSvc.reqUrl + "?$filter=" + encodeURIComponent("ReqId eq '" + sReqId + "'"), { headers: _FETCH_HDR });
+            const oResp = await fetch(oSvc.reqUrl + "?$filter=" + encodeURIComponent("ReqId eq " + sReqId), { headers: _FETCH_HDR });
             if (!oResp.ok) continue;
             const aItems = ((await oResp.json()).value || []);
             if (!aItems.length) continue;
@@ -398,21 +783,46 @@ sap.ui.define(
         return aRows;
       },
 
-      // ─── Get OData V4 context for a specific (ReqId, EnvId) ──────────────────
-      //   Used to execute bound actions (promote / rollback) via OData model.
+      // ─── Execute a bound OData V4 action directly via fetch ──────────────────
+      //   Bypasses the OData V4 model's bindList+requestContexts which fails for
+      //   ZC_CONF_REQ_H (model auto-filters by IsActiveEntity for draft entities,
+      //   or the entity isn't in the local metadata document).
 
-      _getODataContext: async function (sReqId, sEnvId) {
-        const oModel   = this.getView().getModel();
-        const oBinding = oModel.bindList("/ZC_CONF_REQ_H", null, null, [
-          new Filter("ReqId", FilterOperator.EQ, sReqId),
-          new Filter("EnvId", FilterOperator.EQ, sEnvId),
-        ]);
+      _execBoundAction: async function (sReqId, sEnvId, sActionName) {
+        // Step 1: obtain CSRF token (required for POST in SAP OData)
+        let sToken = "";
         try {
-          const aCtx = await oBinding.requestContexts(0, 1);
-          return aCtx[0] || null;
+          const oHead = await fetch(_BASE_URL, {
+            method: "HEAD",
+            headers: Object.assign({}, _FETCH_HDR, { "X-CSRF-Token": "Fetch" }),
+          });
+          sToken = oHead.headers.get("x-csrf-token") || oHead.headers.get("X-CSRF-Token") || "";
         } catch (e) {
-          console.error("_getODataContext failed:", e);
-          return null;
+          console.warn("CSRF fetch failed, continuing without token:", e);
+        }
+
+        // Step 2: POST to bound action URL
+        //   ZC_CONF_REQ_H entity keys = ReqId (Edm.Guid) + EnvId (String) + IsActiveEntity (Edm.Boolean)
+        //   BE added EnvId as a key property → must include all 3 keys in the URL.
+        const sFqn = "com.sap.gateway.srvd.zsd_conf_req.v0001." + sActionName;
+        const sUrl = _BASE_URL + "ZC_CONF_REQ_H(ReqId=" + sReqId + ",EnvId='" + sEnvId + "',IsActiveEntity=true)/" + sFqn;
+
+        const oResp = await fetch(sUrl, {
+          method: "POST",
+          headers: Object.assign({}, _FETCH_HDR, {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": sToken,
+          }),
+          body: JSON.stringify({}),
+        });
+
+        if (!oResp.ok) {
+          let sMsg = "HTTP " + oResp.status;
+          try {
+            const oBody = await oResp.json();
+            sMsg = (oBody.error && oBody.error.message) || sMsg;
+          } catch (e) { /* ignore JSON parse error */ }
+          throw new Error(sMsg);
         }
       },
 
@@ -421,7 +831,7 @@ sap.ui.define(
       _checkRollbackOrder: async function (sReqId, sCurrentEnv) {
         if (sCurrentEnv === "PRD") return null;
         const aHigher = sCurrentEnv === "DEV" ? ["QAS", "PRD"] : ["PRD"];
-        const sFilter = "ReqId eq '" + sReqId + "' and (" +
+        const sFilter = "ReqId eq " + sReqId + " and (" +
           aHigher.map(function (e) { return "EnvId eq '" + e + "'"; }).join(" or ") + ")";
         const sUrl = _BASE_URL + "ZC_CONF_REQ_H?$filter=" +
           encodeURIComponent(sFilter) + "&$select=EnvId&$top=3";
@@ -438,6 +848,108 @@ sap.ui.define(
           console.warn("Rollback order check failed:", e);
           return null;
         }
+      },
+
+      // ─── Dialog: Toggle changed-only filter ──────────────────────────────────
+
+      onToggleChangedOnly: function (oEvent) {
+        const bPressed = oEvent.getSource().getPressed();
+        const oModel = this._oDetailDialog.getModel("detail");
+        const aAll = oModel.getProperty("/lines");
+        oModel.setProperty("/showChangedOnly", bPressed);
+        oModel.setProperty("/linesDisplay",
+          bPressed ? aAll.filter(function (l) { return l.changed; }) : aAll
+        );
+        this.byId("previewTable").setNoDataText(
+          (bPressed && !aAll.some(function (l) { return l.changed; }))
+            ? "Không có thay đổi nào." : ""
+        );
+      },
+
+      // ─── Dialog: Quick rollback từ table row ─────────────────────────────────
+      //   Nhấn nút ↩ trực tiếp ở bảng → check order → mở dialog ở chế độ confirm
+
+      onQuickRollbackPress: async function (oEvent) {
+        const oCtx  = oEvent.getSource().getParent().getBindingContext("vm");
+        const oItem = oCtx.getObject();
+        this._oCurrentItem = oItem;
+
+        const oView = this.getView();
+        oView.setBusy(true);
+        const sBlockingEnv = await this._checkRollbackOrder(oItem.ReqId, oItem.EnvId);
+        oView.setBusy(false);
+
+        if (sBlockingEnv) {
+          MessageBox.warning(
+            "Không thể rollback " + oItem.EnvId + " lúc này!\n\n" +
+            "ENV " + sBlockingEnv + " vẫn đang ACTIVE với cùng request.\n" +
+            "Phải rollback " + sBlockingEnv + " trước.\n\n" +
+            "Thứ tự bắt buộc: PRD → QAS → DEV",
+            { title: "Rollback Order Violation", actions: [MessageBox.Action.CLOSE] }
+          );
+          return;
+        }
+
+        // Mở dialog với confirm panel đã sẵn sàng (bAutoRollback = true)
+        const bIsPromote = oItem.EnvId !== "PRD";
+        await this._openDetailDialog(oItem, bIsPromote, true);
+      },
+
+      // ─── Dialog: Rollback node button — hiện confirm panel inline ────────────
+
+      onNodeRollbackPress: async function (oEvent) {
+        const sEnv   = oEvent.getSource().data("env");
+        const sReqId = this._oCurrentItem.ReqId;
+
+        const oView = this.getView();
+        oView.setBusy(true);
+        const sBlockingEnv = await this._checkRollbackOrder(sReqId, sEnv);
+        oView.setBusy(false);
+
+        if (sBlockingEnv) {
+          MessageBox.warning(
+            "Không thể rollback " + sEnv + " lúc này!\n\n" +
+            "ENV " + sBlockingEnv + " vẫn đang ACTIVE với cùng request.\n" +
+            "Phải rollback " + sBlockingEnv + " trước.\n\n" +
+            "Thứ tự bắt buộc: PRD → QAS → DEV",
+            { title: "Rollback Order Violation", actions: [MessageBox.Action.CLOSE] }
+          );
+          return;
+        }
+
+        const oModel = this._oDetailDialog.getModel("detail");
+        oModel.setProperty("/rollbackTargetEnv",   sEnv);
+        oModel.setProperty("/showRollbackConfirm", true);
+      },
+
+      // ─── Dialog: Xác nhận rollback (từ inline confirm panel) ─────────────────
+
+      onRollbackConfirm: async function () {
+        const oModel = this._oDetailDialog.getModel("detail");
+        const sEnvId = oModel.getProperty("/rollbackTargetEnv");
+        const sReqId = this._oCurrentItem.ReqId;
+
+        oModel.setProperty("/showRollbackConfirm", false);
+        this._oDetailDialog.close();
+
+        const oView = this.getView();
+        oView.setBusy(true);
+        try {
+          await this._execBoundAction(sReqId, sEnvId, "rollback");
+          this._loadRequests();
+          MessageBox.success("Đã rollback thành công — ENV: " + sEnvId + ".");
+        } catch (e) {
+          console.error(e);
+          MessageBox.error("Rollback thất bại: " + (e.message || e));
+        } finally {
+          oView.setBusy(false);
+        }
+      },
+
+      // ─── Dialog: Hủy rollback ─────────────────────────────────────────────────
+
+      onRollbackCancel: function () {
+        this._oDetailDialog.getModel("detail").setProperty("/showRollbackConfirm", false);
       },
 
       // ─── Dialog: Rollback ─────────────────────────────────────────────────────
@@ -475,11 +987,7 @@ sap.ui.define(
               this._oDetailDialog.close();
               oView.setBusy(true);
               try {
-                const oCtx = await this._getODataContext(sReqId, sEnvId);
-                if (!oCtx) throw new Error("Không tìm thấy record trên server.");
-                await this.getView().getModel().bindContext(
-                  "com.sap.gateway.srvd.zsd_conf_req.v0001.rollback(...)", oCtx
-                ).execute("$auto");
+                await this._execBoundAction(sReqId, sEnvId, "rollback");
                 this._loadRequests();
                 MessageBox.success("Đã rollback thành công — ENV: " + sEnvId + ".");
               } catch (e) {
@@ -518,11 +1026,7 @@ sap.ui.define(
               const oView = this.getView();
               oView.setBusy(true);
               try {
-                const oCtx = await this._getODataContext(oItem.ReqId, sCurEnv);
-                if (!oCtx) throw new Error("Không tìm thấy record trên server.");
-                await this.getView().getModel().bindContext(
-                  "com.sap.gateway.srvd.zsd_conf_req.v0001.promote(...)", oCtx
-                ).execute("$auto");
+                await this._execBoundAction(oItem.ReqId, sCurEnv, "promote");
                 this._loadRequests();
                 MessageBox.success("Đã promote thành công lên " + sNextEnv + ".");
               } catch (e) {
