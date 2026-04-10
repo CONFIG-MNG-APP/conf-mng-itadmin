@@ -2,33 +2,48 @@
     controllerName="zgsp26.conf.mng.itadmin.ext.main.Main"
     xmlns:mvc="sap.ui.core.mvc"
     xmlns="sap.m"
+    xmlns:f="sap.f"
     xmlns:core="sap.ui.core"
     xmlns:l="sap.ui.layout">
 
-    <Page id="mainPage" showHeader="false">
-        <content>
-            <VBox>
+    <f:DynamicPage id="mainPage" toggleHeaderOnTitleClick="false" headerPinned="true">
 
-                <!-- ══ ZONE 1: HEADER — nền trắng (title + KPI + tabs) ══════ -->
-                <VBox class="itadmin-header-zone">
+        <!-- ─── Title ─── -->
+        <f:title>
+            <f:DynamicPageTitle>
+                <f:heading>
+                    <VBox>
+                        <HBox alignItems="Center">
+                            <core:Icon src="sap-icon://it-system" size="1.5rem" color="#0070f2" class="sapUiSmallMarginEnd"/>
+                            <Title text="IT Admin — Configuration Management" level="H2"/>
+                        </HBox>
+                        <Text text="Quản lý và promote configuration requests qua các môi trường" class="itadmin-subtitle"/>
+                    </VBox>
+                </f:heading>
+                <f:actions>
+                    <HBox alignItems="Center" class="itadmin-notif-wrapper">
+                        <Button id="notifBell"
+                                icon="sap-icon://bell"
+                                type="Transparent"
+                                tooltip="Thông báo"
+                                press=".onNotifBellPress">
+                            <customData>
+                                <BadgeCustomData key="badge"
+                                    value="{notif>/count}"
+                                    visible="{= ${notif>/count} > 0}"/>
+                            </customData>
+                        </Button>
+                    </HBox>
+                </f:actions>
+                <f:snappedContent>
+                    <Text text="{= ${kpi>/total} + ' requests'}" class="itadmin-subtitle"/>
+                </f:snappedContent>
+            </f:DynamicPageTitle>
+        </f:title>
 
-                <!-- ── Title bar ─────────────────────────────────────────────────── -->
-                <Toolbar style="Clear" class="sapUiSmallMarginBegin sapUiSmallMarginEnd sapUiSmallMarginTop sapUiSmallMarginBottom">
-                    <Title text="IT Admin — Configuration Management" level="H2"/>
-                    <ToolbarSpacer/>
-                    <Button id="notifBell"
-                            icon="sap-icon://bell"
-                            tooltip="Thông báo"
-                            press=".onNotifBellPress">
-                        <customData>
-                            <BadgeCustomData key="badge"
-                                value="{notif>/count}"
-                                visible="{= ${notif>/count} > 0}"/>
-                        </customData>
-                    </Button>
-                </Toolbar>
-
-                <!-- ── KPI Dashboard — 4 cards với border-top màu, trải đều ─── -->
+        <!-- ─── Header: KPI Cards ─── -->
+        <f:header>
+            <f:DynamicPageHeader pinnable="true">
                 <FlexBox width="100%" alignItems="Stretch" class="itadmin-kpi-row">
 
                     <!-- Chờ → QAS -->
@@ -104,11 +119,14 @@
                     </VBox>
 
                 </FlexBox>
+            </f:DynamicPageHeader>
+        </f:header>
 
-                </VBox>
-                <!-- ══ END ZONE 1 ══════════════════════════════════════════ -->
+        <!-- ─── Content ─── -->
+        <f:content>
+            <VBox class="sapUiMediumMarginBegin sapUiMediumMarginEnd sapUiSmallMarginTop sapUiMediumMarginBottom">
 
-                <!-- ══ ZONE 2: CONTENT — tabs + filter + table trên nền xám ══ -->
+                <!-- ══ ZONE 2: CONTENT — tabs + filter + table ══ -->
                 <IconTabBar id="moduleTabBar"
                     expandable="false"
                     stretchContentHeight="false"
@@ -147,9 +165,7 @@
                     <content>
 
                         <!-- ══ PENDING REQUESTS SECTION ══════════════════════ -->
-                        <VBox visible="{= ${kpi>/isAuditMode} !== true}"
-                              class="itadmin-content-wrapper">
-                            <VBox class="itadmin-content-zone">
+                        <VBox visible="{= ${kpi>/isAuditMode} !== true}" class="sapUiSmallMarginTop">
 
                             <!-- ── Filter bar ──────────────────────────────── -->
                             <Toolbar class="itadmin-filter-bar" style="Clear">
@@ -198,7 +214,8 @@
                                    noDataText="Không có request nào đang chờ xử lý."
                                    items="{vm>/requests}"
                                    growing="true" growingThreshold="25"
-                                   alternateRowColors="true">
+                                   alternateRowColors="true"
+                                   class="itadmin-table">
 
                                 <headerToolbar>
                                     <OverflowToolbar style="Clear">
@@ -218,20 +235,11 @@
                                     </OverflowToolbar>
                                 </headerToolbar>
 
-                                <!-- 4 cột: Module | Request Info | ENV Pipeline | Actions -->
                                 <columns>
-                                    <Column width="7rem" vAlign="Middle">
-                                        <Text text="Module"/>
-                                    </Column>
-                                    <Column vAlign="Middle">
-                                        <Text text="Request"/>
-                                    </Column>
-                                    <Column width="21rem" vAlign="Middle">
-                                        <Text text="Tiến trình"/>
-                                    </Column>
-                                    <Column width="11rem" hAlign="End" vAlign="Middle">
-                                        <Text text="Action"/>
-                                    </Column>
+                                    <Column width="7rem" vAlign="Middle"><Text text="Module"/></Column>
+                                    <Column vAlign="Middle"><Text text="Request"/></Column>
+                                    <Column width="21rem" vAlign="Middle"><Text text="Tiến trình"/></Column>
+                                    <Column width="11rem" hAlign="End" vAlign="Middle"><Text text="Action"/></Column>
                                 </columns>
 
                                 <items>
@@ -240,7 +248,6 @@
                                         highlightText="{= ${vm>Status} === 'APPROVED' ? 'Chờ promote' : 'Đang active'}">
                                         <cells>
 
-                                            <!-- ① Module badge + full label -->
                                             <VBox alignItems="Center" justifyContent="Center">
                                                 <ObjectStatus
                                                     text="{vm>ModuleId}"
@@ -255,28 +262,19 @@
                                                     class="sapUiTinyMarginTop sapUiSmallText sapThemeNeutralText"/>
                                             </VBox>
 
-                                            <!-- ② Request title + key info + change summary + by/date -->
                                             <VBox>
-                                                <!-- Tên request -->
                                                 <Text text="{= ${vm>ReqTitle} || '-'}"
                                                       class="sapUiBoldText"
                                                       wrapping="false" maxLines="1"/>
-
-                                                <!-- Key info + change summary -->
                                                 <HBox alignItems="Center" class="sapUiTinyMarginTop">
                                                     <core:Icon src="sap-icon://key"
                                                                color="#89919A" size="0.75rem"
                                                                class="sapUiTinyMarginEnd"/>
-                                                    <Text text="{vm>_keyInfo}"
-                                                          wrapping="false"
-                                                          class="sapUiSmallText"/>
+                                                    <Text text="{vm>_keyInfo}" wrapping="false" class="sapUiSmallText"/>
                                                     <Text text="{= ${vm>_changeSummary} ? '  ·  ' + ${vm>_changeSummary} : ''}"
-                                                          wrapping="false"
-                                                          class="sapUiSmallText"
+                                                          wrapping="false" class="sapUiSmallText"
                                                           visible="{= !!${vm>_changeSummary}}"/>
                                                 </HBox>
-
-                                                <!-- Số lượng thay đổi + by + date -->
                                                 <HBox alignItems="Center" class="sapUiTinyMarginTop">
                                                     <ObjectStatus
                                                         text="{= ${vm>_changeCount} + ' thay đổi'}"
@@ -287,33 +285,26 @@
                                                     <core:Icon src="sap-icon://employee"
                                                                color="#89919A" size="0.75rem"
                                                                class="sapUiTinyMarginEnd"/>
-                                                    <Text text="{vm>CreatedBy}"
-                                                          class="sapUiSmallText sapUiTinyMarginEnd"/>
+                                                    <Text text="{vm>CreatedBy}" class="sapUiSmallText sapUiTinyMarginEnd"/>
                                                     <Text text="·" class="sapUiSmallText sapUiTinyMarginEnd"/>
-                                                    <Text text="{vm>_createdAtFmt}"
-                                                          class="sapUiSmallText"/>
+                                                    <Text text="{vm>_createdAtFmt}" class="sapUiSmallText"/>
                                                 </HBox>
                                             </VBox>
 
-                                            <!-- ③ ENV pipeline: pills DEV → QAS → PRD -->
                                             <VBox justifyContent="Center">
                                                 <HBox alignItems="Center">
-                                                    <!-- DEV: luôn done hoặc current -->
                                                     <ObjectStatus text="DEV" inverted="true"
                                                         state="{= ${vm>EnvId} === 'DEV' ? 'Warning' : 'Success'}"/>
                                                     <Text text=" ›" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
-                                                    <!-- QAS -->
                                                     <ObjectStatus text="QAS"
                                                         inverted="{= ${vm>EnvId} === 'QAS' || ${vm>EnvId} === 'PRD'}"
                                                         state="{= ${vm>EnvId} === 'QAS' ? 'Warning' :
                                                                    (${vm>EnvId} === 'PRD' ? 'Success' : 'None')}"/>
                                                     <Text text=" ›" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
-                                                    <!-- PRD -->
                                                     <ObjectStatus text="PRD"
                                                         inverted="{= ${vm>EnvId} === 'PRD'}"
                                                         state="{= ${vm>EnvId} === 'PRD' ? 'Success' : 'None'}"/>
                                                 </HBox>
-                                                <!-- Next step label -->
                                                 <HBox alignItems="Center" class="sapUiTinyMarginTop"
                                                       visible="{= !!${vm>_nextEnv}}">
                                                     <core:Icon src="sap-icon://journey-arrive"
@@ -327,14 +318,11 @@
                                                     <core:Icon src="sap-icon://accept"
                                                                color="#107E3E" size="0.8rem"
                                                                class="sapUiTinyMarginEnd"/>
-                                                    <Text text="Đã live tại PRD"
-                                                          class="sapUiSmallText"/>
+                                                    <Text text="Đã live tại PRD" class="sapUiSmallText"/>
                                                 </HBox>
                                             </VBox>
 
-                                            <!-- ④ Action buttons -->
                                             <HBox alignItems="Center" justifyContent="End">
-                                                <!-- Promote: hiện khi còn nextEnv -->
                                                 <Button
                                                     text="{= '→ ' + ${vm>_nextEnv}}"
                                                     type="Accept"
@@ -342,7 +330,6 @@
                                                     tooltip="{= 'Promote lên ' + ${vm>_nextEnv}}"
                                                     visible="{= !!${vm>_nextEnv}}"
                                                     press=".onActionPress"/>
-                                                <!-- View: luôn hiện -->
                                                 <Button
                                                     icon="sap-icon://detail-view"
                                                     type="Default"
@@ -350,7 +337,6 @@
                                                     visible="{= !${vm>_nextEnv}}"
                                                     press=".onActionPress"
                                                     class="{= ${vm>_nextEnv} ? 'sapUiTinyMarginBegin' : ''}"/>
-                                                <!-- Rollback: hiện khi ACTIVE -->
                                                 <Button
                                                     icon="sap-icon://undo"
                                                     type="Reject"
@@ -365,17 +351,13 @@
                                 </items>
 
                             </Table>
-                            </VBox><!-- end itadmin-content-zone -->
                         </VBox>
 
                         <!-- ══ AUDIT TRAIL SECTION ════════════════════════════ -->
-                        <VBox visible="{= ${kpi>/isAuditMode} === true}"
-                              class="itadmin-content-wrapper">
-                            <VBox class="itadmin-content-zone">
+                        <VBox visible="{= ${kpi>/isAuditMode} === true}" class="sapUiSmallMarginTop">
 
                             <!-- ── Audit Filter bar ──────────────────────── -->
                             <Toolbar style="Clear" class="itadmin-filter-bar">
-
                                 <Label text="Module:"/>
                                 <Select id="auditModuleFilter" width="8rem"
                                         selectedKey="" change=".onAuditFilter">
@@ -433,12 +415,12 @@
                                    items="{vm>/auditDisplay}"
                                    noDataText="Không có dữ liệu audit."
                                    growing="true" growingThreshold="50"
-                                   alternateRowColors="true">
+                                   alternateRowColors="true"
+                                   class="itadmin-table">
 
                                 <headerToolbar>
                                     <OverflowToolbar style="Clear">
-                                        <Title text="Lịch sử thay đổi (Audit Trail)"
-                                               level="H4"/>
+                                        <Title text="Lịch sử thay đổi (Audit Trail)" level="H4"/>
                                         <ToolbarSpacer/>
                                         <ObjectStatus
                                             text="{= ${vm>/auditDisplay}.length + ' records'}"
@@ -501,9 +483,7 @@
                                                           ${vm>status} === 'ROLLED_BACK' ? 'Error'    : 'None'}"
                                                 inverted="{= ${vm>status} !== 'DRAFT'}"/>
 
-                                            <ObjectStatus
-                                                text="{vm>versionNo}"
-                                                state="Information"/>
+                                            <ObjectStatus text="{vm>versionNo}" state="Information"/>
 
                                             <HBox alignItems="Center">
                                                 <core:Icon src="sap-icon://employee"
@@ -517,13 +497,13 @@
                                 </items>
 
                             </Table>
-                            </VBox><!-- end itadmin-content-zone -->
                         </VBox>
 
                     </content>
                 </IconTabBar>
 
             </VBox>
-        </content>
-    </Page>
+        </f:content>
+
+    </f:DynamicPage>
 </mvc:View>

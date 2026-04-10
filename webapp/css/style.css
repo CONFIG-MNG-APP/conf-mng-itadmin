@@ -1,27 +1,20 @@
 /* ═══════════════════════════════════════════════════════════════════
    IT Admin — Configuration Management  |  Custom Stylesheet
-   Layout 2 zone: header trắng (KPI) + content xám (table card trắng)
+   Layout: f:DynamicPage (chuẩn SAP Fiori, giống catalog app)
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── Zone 1: Toàn bộ page nền xám (content zone) ───────────────────── */
-.sapMPage,
-.sapMPage > .sapMPageEnableScrolling,
-.sapMPage > section {
-    background: #F5F6F7 !important;
-}
-
-/* ── Zone 1 override: Header zone (title + KPI row) nền trắng ───────── */
-.itadmin-header-zone {
-    background: #FFFFFF;
-    padding-bottom: 0;
+/* ── Title subtitle ─────────────────────────────────────────────── */
+.itadmin-subtitle {
+    font-size: 0.8rem !important;
+    color: #6a6d70 !important;
+    margin-top: 2px !important;
 }
 
 /* ── KPI Dashboard Row ─────────────────────────────────────────────── */
 .itadmin-kpi-row {
-    background: transparent;
-    padding: 0.75rem 1.25rem 1.25rem 1.25rem !important;
     gap: 0.875rem;
     display: flex;
+    padding: 0.5rem 0 0.25rem 0;
 }
 
 /* Card: nền trắng, border-top màu accent, shadow nhẹ */
@@ -90,54 +83,22 @@
     font-size: 0.8rem !important;
 }
 
-/* ── IconTabBar — nằm ở ranh giới 2 zone, nền trắng ────────────────── */
-.itadmin-module-tabs,
-.itadmin-module-tabs > .sapMITBHead {
-    background: #FFFFFF !important;
-}
-
-.itadmin-module-tabs {
-    border-top: none;
-}
-
-/* Xóa border mặc định của SAP IconTabBar */
+/* ── IconTabBar ─────────────────────────────────────────────────── */
 .itadmin-module-tabs .sapMITBHead,
-.itadmin-module-tabs .sapMITBFilter,
 .itadmin-module-tabs > .sapMITB {
     border-top: none !important;
     border-bottom: none !important;
     box-shadow: none !important;
 }
 
-/* Phần content bên trong tab (filter + table) kế thừa nền xám từ page */
-.itadmin-module-tabs .sapMITBContainerContent {
-    background: #F5F6F7 !important;
-}
-
-/* ── Content zone: table card trắng nổi trên nền xám ───────────────── */
-.itadmin-content-zone {
-    background: #FFFFFF;
-    border-radius: 8px;
-    border: 1px solid #E8E8E8;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-    overflow: hidden;
-}
-
-/* Outer wrapper — padding 2 bên tạo khoảng trắng xám */
-.itadmin-content-wrapper {
-    padding: 0.75rem 3rem 1.5rem 3rem;
-}
+/* ── Filter bar ─────────────────────────────────────────────────── */
 .itadmin-filter-bar {
     background: #FFFFFF !important;
-    border-bottom: 1px solid #E8E8E8 !important;
-    border-radius: 0 !important;
-    border-left: none !important;
-    border-right: none !important;
-    border-top: none !important;
+    border: 1px solid #E8E8E8 !important;
+    border-radius: 8px 8px 0 0 !important;
     padding: 0.625rem 1rem !important;
     margin: 0 !important;
     min-height: 3rem !important;
-    gap: 0 !important;
 }
 
 .itadmin-filter-label {
@@ -167,16 +128,16 @@
     border-radius: 6px !important;
 }
 
-/* ── Table — không border riêng, nằm trong content card ────────────── */
-#requestTable.sapMList,
-#auditTable.sapMList {
-    background: #FFFFFF;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
+/* ── Table ──────────────────────────────────────────────────────── */
+.itadmin-table.sapMList {
+    border: 1px solid #E8E8E8 !important;
+    border-top: none !important;
+    border-radius: 0 0 8px 8px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+    overflow: hidden;
 }
 
-/* ── Preview diff inner table — compact, no outer border ───────────── */
+/* ── Preview diff inner table ───────────────────────────────────── */
 .itadmin-diff-inner-table.sapMList {
     border: none !important;
     box-shadow: none !important;
@@ -186,7 +147,7 @@
     background: transparent !important;
 }
 
-/* ── Promote Journey ────────────────────────────────────────────────── */
+/* ── Promote Journey ────────────────────────────────────────────── */
 .itadmin-journey-card {
     padding: 1rem 0.75rem;
     border-radius: 10px;
@@ -249,7 +210,7 @@
     margin-top: -0.5rem;
 }
 
-/* ── Preview table — action badge colors ────────────────────────────── */
+/* ── Action badge colors ────────────────────────────────────────── */
 .itadmin-action-create { background: #107E3E !important; color: #fff !important; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; font-weight: 700; }
 .itadmin-action-delete { background: #BB0000 !important; color: #fff !important; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; font-weight: 700; }
 .itadmin-action-update { background: #E9730C !important; color: #fff !important; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; font-weight: 700; }
