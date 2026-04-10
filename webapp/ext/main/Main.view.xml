@@ -2,55 +2,20 @@
     controllerName="zgsp26.conf.mng.itadmin.ext.main.Main"
     xmlns:mvc="sap.ui.core.mvc"
     xmlns="sap.m"
-    xmlns:core="sap.ui.core">
+    xmlns:core="sap.ui.core"
+    xmlns:l="sap.ui.layout">
 
     <Page id="mainPage" showHeader="false">
         <content>
             <VBox>
 
-                <!-- ══════════════════════════════════════════════════════════
-                     HEADER BAR — title + compact KPI indicators
-                ══════════════════════════════════════════════════════════ -->
-                <Toolbar style="Clear" class="sapUiSmallMarginBottom">
+                <!-- ══ ZONE 1: HEADER — nền trắng (title + KPI + tabs) ══════ -->
+                <VBox class="itadmin-header-zone">
+
+                <!-- ── Title bar ─────────────────────────────────────────────────── -->
+                <Toolbar style="Clear" class="sapUiSmallMarginBegin sapUiSmallMarginEnd sapUiSmallMarginTop sapUiSmallMarginBottom">
                     <Title text="IT Admin — Configuration Management" level="H2"/>
                     <ToolbarSpacer/>
-                    <!-- DEV -->
-                    <HBox alignItems="Center" class="sapUiSmallMarginEnd">
-                        <core:Icon src="sap-icon://developer-settings"
-                                   color="#0070F2" size="1rem"
-                                   class="sapUiTinyMarginEnd"/>
-                        <Text text="DEV" class="sapUiTinyMarginEnd"/>
-                        <ObjectNumber number="{kpi>/atDev}" state="Information" emphasized="false"/>
-                    </HBox>
-                    <Text text="|" class="sapUiSmallMarginEnd sapUiSmallMarginBegin"/>
-                    <!-- QAS -->
-                    <HBox alignItems="Center" class="sapUiSmallMarginEnd">
-                        <core:Icon src="sap-icon://quality-issue"
-                                   color="#E9730C" size="1rem"
-                                   class="sapUiTinyMarginEnd"/>
-                        <Text text="QAS" class="sapUiTinyMarginEnd"/>
-                        <ObjectNumber number="{kpi>/atQas}" state="Warning" emphasized="false"/>
-                    </HBox>
-                    <Text text="|" class="sapUiSmallMarginEnd sapUiSmallMarginBegin"/>
-                    <!-- PRD -->
-                    <HBox alignItems="Center" class="sapUiSmallMarginEnd">
-                        <core:Icon src="sap-icon://flag"
-                                   color="#107E3E" size="1rem"
-                                   class="sapUiTinyMarginEnd"/>
-                        <Text text="PRD" class="sapUiTinyMarginEnd"/>
-                        <ObjectNumber number="{kpi>/atPrd}" state="Success" emphasized="false"/>
-                    </HBox>
-                    <Text text="|" class="sapUiSmallMarginEnd sapUiSmallMarginBegin"/>
-                    <!-- Total -->
-                    <HBox alignItems="Center">
-                        <core:Icon src="sap-icon://documents"
-                                   color="#89919A" size="1rem"
-                                   class="sapUiTinyMarginEnd"/>
-                        <Text text="Total" class="sapUiTinyMarginEnd"/>
-                        <ObjectNumber number="{kpi>/total}" emphasized="false"/>
-                    </HBox>
-                    <ToolbarSeparator class="sapUiSmallMarginBegin sapUiSmallMarginEnd"/>
-                    <!-- Bell notification -->
                     <Button id="notifBell"
                             icon="sap-icon://bell"
                             tooltip="Thông báo"
@@ -63,101 +28,174 @@
                     </Button>
                 </Toolbar>
 
-                <!-- ══════════════════════════════════════════════════════════
-                     MODULE TABS — IconTabBar with per-module request counts
-                ══════════════════════════════════════════════════════════ -->
+                <!-- ── KPI Dashboard — 4 cards với border-top màu, trải đều ─── -->
+                <FlexBox width="100%" alignItems="Stretch" class="itadmin-kpi-row">
+
+                    <!-- Chờ → QAS -->
+                    <VBox class="itadmin-kpi-card itadmin-kpi-card--dev">
+                        <layoutData><FlexItemData growFactor="1" shrinkFactor="1"/></layoutData>
+                        <HBox alignItems="Center">
+                            <core:Icon src="sap-icon://developer-settings"
+                                       color="#E9730C" size="0.95rem"
+                                       class="sapUiTinyMarginEnd"/>
+                            <Text text="CHỜ → QAS" class="itadmin-kpi-label"/>
+                        </HBox>
+                        <Text text="{kpi>/atDev}" class="itadmin-kpi-number itadmin-kpi-number--dev"/>
+                        <Text text="requests đang ở DEV" class="itadmin-kpi-sub"/>
+                        <Button text="Lọc theo ENV này" type="Transparent"
+                                icon="sap-icon://arrow-right" iconFirst="false"
+                                press=".onKpiTilePress">
+                            <customData><core:CustomData key="env" value="DEV"/></customData>
+                        </Button>
+                    </VBox>
+
+                    <!-- Chờ → PRD -->
+                    <VBox class="itadmin-kpi-card itadmin-kpi-card--qas">
+                        <layoutData><FlexItemData growFactor="1" shrinkFactor="1"/></layoutData>
+                        <HBox alignItems="Center">
+                            <core:Icon src="sap-icon://quality-issue"
+                                       color="#0070F2" size="0.95rem"
+                                       class="sapUiTinyMarginEnd"/>
+                            <Text text="CHỜ → PRD" class="itadmin-kpi-label"/>
+                        </HBox>
+                        <Text text="{kpi>/atQas}" class="itadmin-kpi-number itadmin-kpi-number--qas"/>
+                        <Text text="requests đang ở QAS" class="itadmin-kpi-sub"/>
+                        <Button text="Lọc theo ENV này" type="Transparent"
+                                icon="sap-icon://arrow-right" iconFirst="false"
+                                press=".onKpiTilePress">
+                            <customData><core:CustomData key="env" value="QAS"/></customData>
+                        </Button>
+                    </VBox>
+
+                    <!-- Live PRD -->
+                    <VBox class="itadmin-kpi-card itadmin-kpi-card--prd">
+                        <layoutData><FlexItemData growFactor="1" shrinkFactor="1"/></layoutData>
+                        <HBox alignItems="Center">
+                            <core:Icon src="sap-icon://accept"
+                                       color="#107E3E" size="0.95rem"
+                                       class="sapUiTinyMarginEnd"/>
+                            <Text text="LIVE PRD" class="itadmin-kpi-label"/>
+                        </HBox>
+                        <Text text="{kpi>/atPrd}" class="itadmin-kpi-number itadmin-kpi-number--prd"/>
+                        <Text text="requests đang active" class="itadmin-kpi-sub"/>
+                        <Button text="Lọc theo ENV này" type="Transparent"
+                                icon="sap-icon://arrow-right" iconFirst="false"
+                                press=".onKpiTilePress">
+                            <customData><core:CustomData key="env" value="PRD"/></customData>
+                        </Button>
+                    </VBox>
+
+                    <!-- Tổng cộng -->
+                    <VBox class="itadmin-kpi-card itadmin-kpi-card--all">
+                        <layoutData><FlexItemData growFactor="1" shrinkFactor="1"/></layoutData>
+                        <HBox alignItems="Center">
+                            <core:Icon src="sap-icon://activities"
+                                       color="#556B82" size="0.95rem"
+                                       class="sapUiTinyMarginEnd"/>
+                            <Text text="TỔNG CỘNG" class="itadmin-kpi-label"/>
+                        </HBox>
+                        <Text text="{kpi>/total}" class="itadmin-kpi-number itadmin-kpi-number--all"/>
+                        <Text text="APPROVED + ACTIVE" class="itadmin-kpi-sub"/>
+                        <Button text="Xem tất cả" type="Transparent"
+                                icon="sap-icon://arrow-right" iconFirst="false"
+                                press=".onKpiTilePress">
+                            <customData><core:CustomData key="env" value=""/></customData>
+                        </Button>
+                    </VBox>
+
+                </FlexBox>
+
+                </VBox>
+                <!-- ══ END ZONE 1 ══════════════════════════════════════════ -->
+
+                <!-- ══ ZONE 2: CONTENT — tabs + filter + table trên nền xám ══ -->
                 <IconTabBar id="moduleTabBar"
                     expandable="false"
                     stretchContentHeight="false"
                     select=".onTabSelect"
                     selectedKey="MM"
-                    class="sapUiNoContentPadding">
+                    class="sapUiNoContentPadding itadmin-module-tabs">
 
                     <items>
                         <IconTabFilter key="MM"
                             text="MM Routes"
                             count="{= '' + ${kpi>/mmCount}}"
-                            icon="sap-icon://shipping-status"/>
+                            icon="sap-icon://shipping-status"
+                            iconColor="Information"/>
                         <IconTabFilter key="MMSS"
                             text="MM Safe Stock"
                             count="{= '' + ${kpi>/mmssCount}}"
-                            icon="sap-icon://inventory"/>
+                            icon="sap-icon://inventory"
+                            iconColor="Information"/>
                         <IconTabFilter key="FI"
                             text="FI Limit"
                             count="{= '' + ${kpi>/fiCount}}"
-                            icon="sap-icon://money-bills"/>
+                            icon="sap-icon://money-bills"
+                            iconColor="Critical"/>
                         <IconTabFilter key="SD"
                             text="SD Price"
                             count="{= '' + ${kpi>/sdCount}}"
-                            icon="sap-icon://sales-quote"/>
+                            icon="sap-icon://sales-quote"
+                            iconColor="Positive"/>
                         <IconTabSeparator/>
                         <IconTabFilter key="AUDIT"
                             text="Audit Trail"
-                            icon="sap-icon://history"/>
+                            icon="sap-icon://history"
+                            iconColor="Default"/>
                     </items>
 
                     <content>
-                        <!-- ══ Module request section ══ -->
+
+                        <!-- ══ PENDING REQUESTS SECTION ══════════════════════ -->
                         <VBox visible="{= ${kpi>/isAuditMode} !== true}"
-                              class="sapUiSmallMarginBegin sapUiSmallMarginEnd sapUiSmallMarginBottom">
+                              class="itadmin-content-wrapper">
+                            <VBox class="itadmin-content-zone">
 
-                            <!-- ── Version strip — chỉ hiện khi chọn module cụ thể ── -->
-                            <HBox visible="{= !!${kpi>/selectedModule}}"
-                                  alignItems="Center"
-                                  class="sapUiTinyMarginBottom sapUiTinyMarginTop">
-                                <core:Icon src="sap-icon://tag"
-                                           color="#0070F2" size="1rem"
-                                           class="sapUiSmallMarginEnd"/>
-                                <Text text="{kpi>/selectedLabel}"
-                                      class="sapUiBoldText sapUiSmallMarginEnd"/>
-                                <Text text="— phiên bản hiện tại:"
-                                      class="sapUiSmallMarginEnd"/>
-                                <ObjectStatus text="{kpi>/selectedVer}"
-                                              state="Success" inverted="true"/>
-                            </HBox>
-
-                            <!-- ── Compact filter toolbar ─────────────────── -->
-                            <Toolbar style="Clear" class="sapUiTinyMarginBottom">
-
-                                <!-- ENV: SegmentedButton — 1 click thay vì dropdown -->
+                            <!-- ── Filter bar ──────────────────────────────── -->
+                            <Toolbar class="itadmin-filter-bar" style="Clear">
                                 <SegmentedButton id="envSegment"
                                     selectedKey=""
                                     selectionChange=".onFilter">
                                     <items>
-                                        <SegmentedButtonItem key=""    text="All ENV"/>
-                                        <SegmentedButtonItem key="DEV" text="DEV"/>
-                                        <SegmentedButtonItem key="QAS" text="QAS"/>
-                                        <SegmentedButtonItem key="PRD" text="PRD"/>
+                                        <SegmentedButtonItem key=""    text="Tất cả"/>
+                                        <SegmentedButtonItem key="DEV" text="→ QAS"/>
+                                        <SegmentedButtonItem key="QAS" text="→ PRD"/>
+                                        <SegmentedButtonItem key="PRD" text="Live PRD"/>
                                     </items>
                                 </SegmentedButton>
 
-                                <ToolbarSeparator class="sapUiSmallMarginBegin sapUiSmallMarginEnd"/>
+                                <ToolbarSeparator class="itadmin-filter-sep"/>
 
-                                <Label text="Date:" class="sapUiTinyMarginEnd"/>
+                                <Label text="Ngày:" design="Bold" class="itadmin-filter-label"/>
                                 <DateRangeSelection id="dateFilter"
-                                    width="15rem" change=".onFilter"/>
+                                    width="15rem" change=".onFilter"
+                                    placeholder="Từ ngày — đến ngày"/>
 
-                                <ToolbarSeparator class="sapUiSmallMarginBegin sapUiSmallMarginEnd"/>
+                                <ToolbarSeparator class="itadmin-filter-sep"/>
 
                                 <SearchField id="searchField"
-                                    placeholder="REQ_ID / User / Key..."
-                                    width="14rem" search=".onSearch"/>
+                                    placeholder="Tìm theo tên / user / key..."
+                                    width="18rem" search=".onSearch"
+                                    showSearchButton="false"/>
 
                                 <ToolbarSpacer/>
 
                                 <Button icon="sap-icon://clear-filter"
-                                        tooltip="Clear filters"
+                                        tooltip="Xóa bộ lọc"
+                                        type="Transparent"
+                                        class="itadmin-filter-action-btn"
                                         press=".onClearFilter"/>
                                 <Button text="Refresh"
                                         type="Emphasized"
                                         icon="sap-icon://refresh"
+                                        class="itadmin-filter-action-btn"
                                         press=".onRefresh"/>
                             </Toolbar>
 
                             <!-- ── Request Table ──────────────────────────── -->
                             <Table id="requestTable"
                                    mode="None" inset="false"
-                                   noDataText="No data"
+                                   noDataText="Không có request nào đang chờ xử lý."
                                    items="{vm>/requests}"
                                    growing="true" growingThreshold="25"
                                    alternateRowColors="true">
@@ -165,100 +203,159 @@
                                 <headerToolbar>
                                     <OverflowToolbar style="Clear">
                                         <Title id="tableTitle"
-                                               text="Danh sách Request"
+                                               text="Danh sách Request chờ xử lý"
                                                level="H4"/>
                                         <ToolbarSpacer/>
                                         <ObjectStatus
-                                            text="{= ${vm>/requests}.length + ' items'}"
+                                            text="{= ${vm>/requests}.length + ' requests'}"
                                             state="Information"
-                                            icon="sap-icon://list"/>
+                                            icon="sap-icon://activities"/>
+                                        <Button text="Compare ENV"
+                                                icon="sap-icon://compare"
+                                                tooltip="So sánh config giữa 2 môi trường"
+                                                press=".onEnvCompareOpen"
+                                                class="sapUiSmallMarginBegin"/>
                                     </OverflowToolbar>
                                 </headerToolbar>
 
+                                <!-- 4 cột: Module | Request Info | ENV Pipeline | Actions -->
                                 <columns>
-                                    <Column width="13rem"><Text text="Thời gian"/></Column>
-                                    <Column width="6rem"><Text text="Version"/></Column>
-                                    <Column width="7rem"><Text text="Module"/></Column>
-                                    <Column><Text text="Key Info"/></Column>
-                                    <Column width="18rem"><Text text="Journey"/></Column>
-                                    <Column width="10rem"><Text text="By"/></Column>
-                                    <Column width="8rem" hAlign="Center"><Text text="Action"/></Column>
+                                    <Column width="7rem" vAlign="Middle">
+                                        <Text text="Module"/>
+                                    </Column>
+                                    <Column vAlign="Middle">
+                                        <Text text="Request"/>
+                                    </Column>
+                                    <Column width="21rem" vAlign="Middle">
+                                        <Text text="Tiến trình"/>
+                                    </Column>
+                                    <Column width="11rem" hAlign="End" vAlign="Middle">
+                                        <Text text="Action"/>
+                                    </Column>
                                 </columns>
 
                                 <items>
                                     <ColumnListItem
-                                        highlight="{= ${vm>EnvId} === 'PRD' ? 'Success' :
-                                                      ${vm>EnvId} === 'QAS' ? 'Warning' : 'Information'}">
+                                        highlight="{= ${vm>Status} === 'APPROVED' ? 'Warning' : 'Success'}"
+                                        highlightText="{= ${vm>Status} === 'APPROVED' ? 'Chờ promote' : 'Đang active'}">
                                         <cells>
 
-                                            <!-- Thời gian -->
-                                            <Text text="{vm>_createdAtFmt}" wrapping="false"/>
-
-                                            <!-- Version -->
-                                            <ObjectStatus text="{vm>_versionDisplay}"
-                                                          state="Information"/>
-
-                                            <!-- Module badge -->
-                                            <ObjectStatus
-                                                text="{vm>ModuleId}"
-                                                state="{= ${vm>ModuleId} === 'FI'   ? 'Warning'     :
-                                                           ${vm>ModuleId} === 'SD'   ? 'Success'     :
-                                                           ${vm>ModuleId} === 'MMSS' ? 'Information' : 'None'}"
-                                                inverted="true"/>
-
-                                            <!-- Key Info -->
-                                            <Text text="{vm>_keyInfo}" wrapping="true"/>
-
-                                            <!-- Environment Journey: icons + current env badge -->
-                                            <HBox alignItems="Center">
-                                                <core:Icon
-                                                    src="{= ${vm>EnvId} === 'DEV' ? 'sap-icon://circle-task-2' : 'sap-icon://accept'}"
-                                                    color="{= ${vm>EnvId} === 'DEV' ? '#0070F2' : '#107E3E'}"
-                                                    size="1rem"/>
-                                                <Text text=" › "
-                                                      class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
-                                                <core:Icon
-                                                    src="{= ${vm>EnvId} === 'QAS' ? 'sap-icon://circle-task-2' :
-                                                              ${vm>EnvId} === 'PRD' ? 'sap-icon://accept'       :
-                                                              'sap-icon://circle-task'}"
-                                                    color="{= ${vm>EnvId} === 'QAS' ? '#0070F2' :
-                                                               ${vm>EnvId} === 'PRD' ? '#107E3E' : '#89919A'}"
-                                                    size="1rem"/>
-                                                <Text text=" › "
-                                                      class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
-                                                <core:Icon
-                                                    src="{= ${vm>EnvId} === 'PRD' ? 'sap-icon://circle-task-2' : 'sap-icon://circle-task'}"
-                                                    color="{= ${vm>EnvId} === 'PRD' ? '#0070F2' : '#89919A'}"
-                                                    size="1rem"/>
+                                            <!-- ① Module badge + full label -->
+                                            <VBox alignItems="Center" justifyContent="Center">
                                                 <ObjectStatus
-                                                    text="{vm>EnvId}"
-                                                    state="{= ${vm>EnvId} === 'PRD' ? 'Success' :
-                                                               ${vm>EnvId} === 'QAS' ? 'Warning' : 'Information'}"
-                                                    inverted="true"
-                                                    class="sapUiSmallMarginBegin"/>
-                                            </HBox>
+                                                    text="{vm>ModuleId}"
+                                                    state="{= ${vm>ModuleId} === 'FI' ? 'Warning' :
+                                                               ${vm>ModuleId} === 'SD' ? 'Success' : 'Information'}"
+                                                    inverted="true"/>
+                                                <Text
+                                                    text="{= ${vm>ModuleId} === 'FI'   ? 'FI Limit'   :
+                                                               ${vm>ModuleId} === 'SD'   ? 'SD Price'   :
+                                                               ${vm>ModuleId} === 'MMSS' ? 'Safe Stock' : 'MM Route'}"
+                                                    textAlign="Center"
+                                                    class="sapUiTinyMarginTop sapUiSmallText sapThemeNeutralText"/>
+                                            </VBox>
 
-                                            <!-- By -->
-                                            <HBox alignItems="Center">
-                                                <core:Icon src="sap-icon://employee"
-                                                           color="#89919A" size="0.85rem"
-                                                           class="sapUiTinyMarginEnd"/>
-                                                <Text text="{vm>CreatedBy}"/>
-                                            </HBox>
+                                            <!-- ② Request title + key info + change summary + by/date -->
+                                            <VBox>
+                                                <!-- Tên request -->
+                                                <Text text="{= ${vm>ReqTitle} || '-'}"
+                                                      class="sapUiBoldText"
+                                                      wrapping="false" maxLines="1"/>
 
-                                            <!-- Action -->
-                                            <HBox alignItems="Center">
+                                                <!-- Key info + change summary -->
+                                                <HBox alignItems="Center" class="sapUiTinyMarginTop">
+                                                    <core:Icon src="sap-icon://key"
+                                                               color="#89919A" size="0.75rem"
+                                                               class="sapUiTinyMarginEnd"/>
+                                                    <Text text="{vm>_keyInfo}"
+                                                          wrapping="false"
+                                                          class="sapUiSmallText"/>
+                                                    <Text text="{= ${vm>_changeSummary} ? '  ·  ' + ${vm>_changeSummary} : ''}"
+                                                          wrapping="false"
+                                                          class="sapUiSmallText"
+                                                          visible="{= !!${vm>_changeSummary}}"/>
+                                                </HBox>
+
+                                                <!-- Số lượng thay đổi + by + date -->
+                                                <HBox alignItems="Center" class="sapUiTinyMarginTop">
+                                                    <ObjectStatus
+                                                        text="{= ${vm>_changeCount} + ' thay đổi'}"
+                                                        state="{= ${vm>_changeCount} > 0 ? 'Warning' : 'None'}"
+                                                        visible="{= ${vm>_changeCount} >= 0}"
+                                                        class="sapUiTinyMarginEnd"/>
+                                                    <Text text="·" class="sapUiSmallText sapUiTinyMarginEnd"/>
+                                                    <core:Icon src="sap-icon://employee"
+                                                               color="#89919A" size="0.75rem"
+                                                               class="sapUiTinyMarginEnd"/>
+                                                    <Text text="{vm>CreatedBy}"
+                                                          class="sapUiSmallText sapUiTinyMarginEnd"/>
+                                                    <Text text="·" class="sapUiSmallText sapUiTinyMarginEnd"/>
+                                                    <Text text="{vm>_createdAtFmt}"
+                                                          class="sapUiSmallText"/>
+                                                </HBox>
+                                            </VBox>
+
+                                            <!-- ③ ENV pipeline: pills DEV → QAS → PRD -->
+                                            <VBox justifyContent="Center">
+                                                <HBox alignItems="Center">
+                                                    <!-- DEV: luôn done hoặc current -->
+                                                    <ObjectStatus text="DEV" inverted="true"
+                                                        state="{= ${vm>EnvId} === 'DEV' ? 'Warning' : 'Success'}"/>
+                                                    <Text text=" ›" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
+                                                    <!-- QAS -->
+                                                    <ObjectStatus text="QAS"
+                                                        inverted="{= ${vm>EnvId} === 'QAS' || ${vm>EnvId} === 'PRD'}"
+                                                        state="{= ${vm>EnvId} === 'QAS' ? 'Warning' :
+                                                                   (${vm>EnvId} === 'PRD' ? 'Success' : 'None')}"/>
+                                                    <Text text=" ›" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
+                                                    <!-- PRD -->
+                                                    <ObjectStatus text="PRD"
+                                                        inverted="{= ${vm>EnvId} === 'PRD'}"
+                                                        state="{= ${vm>EnvId} === 'PRD' ? 'Success' : 'None'}"/>
+                                                </HBox>
+                                                <!-- Next step label -->
+                                                <HBox alignItems="Center" class="sapUiTinyMarginTop"
+                                                      visible="{= !!${vm>_nextEnv}}">
+                                                    <core:Icon src="sap-icon://journey-arrive"
+                                                               color="#E9730C" size="0.8rem"
+                                                               class="sapUiTinyMarginEnd"/>
+                                                    <Text text="{= 'Bước tiếp: promote → ' + ${vm>_nextEnv}}"
+                                                          class="sapUiSmallText"/>
+                                                </HBox>
+                                                <HBox alignItems="Center" class="sapUiTinyMarginTop"
+                                                      visible="{= !${vm>_nextEnv}}">
+                                                    <core:Icon src="sap-icon://accept"
+                                                               color="#107E3E" size="0.8rem"
+                                                               class="sapUiTinyMarginEnd"/>
+                                                    <Text text="Đã live tại PRD"
+                                                          class="sapUiSmallText"/>
+                                                </HBox>
+                                            </VBox>
+
+                                            <!-- ④ Action buttons -->
+                                            <HBox alignItems="Center" justifyContent="End">
+                                                <!-- Promote: hiện khi còn nextEnv -->
                                                 <Button
-                                                    text="{= ${vm>EnvId} !== 'PRD' ? 'Promote' : 'View'}"
-                                                    type="{= ${vm>EnvId} !== 'PRD' ? 'Accept' : 'Default'}"
-                                                    icon="{= ${vm>EnvId} !== 'PRD' ? 'sap-icon://journey-arrive' : 'sap-icon://detail-view'}"
+                                                    text="{= '→ ' + ${vm>_nextEnv}}"
+                                                    type="Accept"
+                                                    icon="sap-icon://journey-arrive"
+                                                    tooltip="{= 'Promote lên ' + ${vm>_nextEnv}}"
+                                                    visible="{= !!${vm>_nextEnv}}"
                                                     press=".onActionPress"/>
-                                                <!-- Quick rollback — chỉ hiện cho PRD -->
+                                                <!-- View: luôn hiện -->
+                                                <Button
+                                                    icon="sap-icon://detail-view"
+                                                    type="Default"
+                                                    tooltip="Xem chi tiết"
+                                                    visible="{= !${vm>_nextEnv}}"
+                                                    press=".onActionPress"
+                                                    class="{= ${vm>_nextEnv} ? 'sapUiTinyMarginBegin' : ''}"/>
+                                                <!-- Rollback: hiện khi ACTIVE -->
                                                 <Button
                                                     icon="sap-icon://undo"
                                                     type="Reject"
-                                                    tooltip="Rollback PRD"
-                                                    visible="{= ${vm>EnvId} === 'PRD'}"
+                                                    tooltip="Rollback"
+                                                    visible="{= ${vm>Status} === 'ACTIVE'}"
                                                     press=".onQuickRollbackPress"
                                                     class="sapUiTinyMarginBegin"/>
                                             </HBox>
@@ -268,23 +365,26 @@
                                 </items>
 
                             </Table>
+                            </VBox><!-- end itadmin-content-zone -->
                         </VBox>
-                        <!-- ══ Audit Trail section ══ -->
+
+                        <!-- ══ AUDIT TRAIL SECTION ════════════════════════════ -->
                         <VBox visible="{= ${kpi>/isAuditMode} === true}"
-                              class="sapUiSmallMarginBegin sapUiSmallMarginEnd sapUiSmallMarginBottom">
+                              class="itadmin-content-wrapper">
+                            <VBox class="itadmin-content-zone">
 
                             <!-- ── Audit Filter bar ──────────────────────── -->
-                            <Toolbar style="Clear" class="sapUiTinyMarginBottom">
+                            <Toolbar style="Clear" class="itadmin-filter-bar">
 
                                 <Label text="Module:"/>
                                 <Select id="auditModuleFilter" width="8rem"
                                         selectedKey="" change=".onAuditFilter">
                                     <items>
                                         <core:Item key=""     text="Tất cả"/>
-                                        <core:Item key="MM"   text="MM"/>
-                                        <core:Item key="MMSS" text="MMSS"/>
-                                        <core:Item key="FI"   text="FI"/>
-                                        <core:Item key="SD"   text="SD"/>
+                                        <core:Item key="MM"   text="MM Routes"/>
+                                        <core:Item key="MMSS" text="MM Safe Stock"/>
+                                        <core:Item key="FI"   text="FI Limit"/>
+                                        <core:Item key="SD"   text="SD Price"/>
                                     </items>
                                 </Select>
 
@@ -299,13 +399,15 @@
                                     </items>
                                 </Select>
 
-                                <Label text="Action:" class="sapUiSmallMarginBegin"/>
+                                <Label text="Status:" class="sapUiSmallMarginBegin"/>
                                 <Select id="auditStatusFilter" width="11rem"
                                         selectedKey="" change=".onAuditFilter">
                                     <items>
                                         <core:Item key=""            text="Tất cả"/>
+                                        <core:Item key="SUBMITTED"   text="Submitted"/>
+                                        <core:Item key="APPROVED"    text="Approved"/>
+                                        <core:Item key="REJECTED"    text="Rejected"/>
                                         <core:Item key="ACTIVE"      text="Active"/>
-                                        <core:Item key="PROMOTED"    text="Promoted"/>
                                         <core:Item key="ROLLED_BACK" text="Rolled Back"/>
                                     </items>
                                 </Select>
@@ -314,12 +416,12 @@
 
                                 <SearchField id="auditSearch"
                                     placeholder="REQ_ID / User / Tên..."
-                                    width="14rem" search=".onAuditSearch"/>
+                                    width="16rem" search=".onAuditSearch"/>
 
                                 <ToolbarSpacer/>
 
                                 <Button icon="sap-icon://clear-filter"
-                                        tooltip="Clear filters"
+                                        tooltip="Xóa bộ lọc"
                                         press=".onAuditClearFilter"/>
                                 <Button text="Refresh" type="Emphasized"
                                         icon="sap-icon://refresh"
@@ -346,72 +448,63 @@
                                 </headerToolbar>
 
                                 <columns>
-                                    <Column width="13rem"><Text text="Thời gian"/></Column>
+                                    <Column width="12rem"><Text text="Thời gian"/></Column>
                                     <Column width="7rem"><Text text="Module"/></Column>
-                                    <Column width="13rem"><Text text="REQ_ID"/></Column>
+                                    <Column><Text text="Tên Request"/></Column>
                                     <Column width="7rem"><Text text="ENV"/></Column>
-                                    <Column width="11rem"><Text text="Action"/></Column>
+                                    <Column width="10rem"><Text text="Status"/></Column>
                                     <Column width="7rem"><Text text="Version"/></Column>
-                                    <Column><Text text="Tên request"/></Column>
                                     <Column width="10rem"><Text text="Thực hiện bởi"/></Column>
                                 </columns>
 
                                 <items>
                                     <ColumnListItem
                                         highlight="{= ${vm>status} === 'ROLLED_BACK' ? 'Error'   :
+                                                      ${vm>status} === 'REJECTED'    ? 'Error'   :
                                                       ${vm>status} === 'ACTIVE'      ? 'Success' :
-                                                      ${vm>status} === 'PROMOTED'    ? 'Warning' : 'None'}">
+                                                      ${vm>status} === 'APPROVED'    ? 'Success' :
+                                                      ${vm>status} === 'SUBMITTED'   ? 'Warning' : 'None'}">
                                         <cells>
 
-                                            <!-- Thời gian -->
                                             <Text text="{vm>createdAt}"/>
 
-                                            <!-- Module badge -->
                                             <ObjectStatus
                                                 text="{vm>moduleId}"
                                                 state="{= ${vm>moduleId} === 'FI'   ? 'Warning'     :
                                                            ${vm>moduleId} === 'SD'   ? 'Success'     :
-                                                           ${vm>moduleId} === 'MMSS' ? 'Information' : 'None'}"
+                                                           ${vm>moduleId} === 'MMSS' ? 'Information' : 'Error'}"
                                                 inverted="true"/>
 
-                                            <!-- REQ_ID truncated -->
-                                            <Text text="{vm>reqId}"
-                                                  maxLines="1" wrapping="false"/>
+                                            <VBox>
+                                                <Text text="{vm>reqTitle}" wrapping="false" maxLines="1"/>
+                                                <Text text="{vm>reqId}" wrapping="false"
+                                                      class="sapUiSmallText sapThemeNeutralText"/>
+                                            </VBox>
 
-                                            <!-- ENV badge -->
                                             <ObjectStatus
                                                 text="{vm>envId}"
                                                 state="{= ${vm>envId} === 'PRD' ? 'Success' :
                                                            ${vm>envId} === 'QAS' ? 'Warning' : 'Information'}"
                                                 inverted="true"/>
 
-                                            <!-- Action / Status -->
-                                            <HBox alignItems="Center">
-                                                <core:Icon
-                                                    src="{= ${vm>status} === 'ACTIVE'      ? 'sap-icon://accept'  :
-                                                              ${vm>status} === 'PROMOTED'    ? 'sap-icon://journey-arrive' :
-                                                              ${vm>status} === 'ROLLED_BACK' ? 'sap-icon://undo'   :
-                                                              'sap-icon://question-mark'}"
-                                                    color="{= ${vm>status} === 'ACTIVE'      ? '#107E3E' :
-                                                               ${vm>status} === 'PROMOTED'    ? '#E9730C' :
-                                                               ${vm>status} === 'ROLLED_BACK' ? '#BB0000' : '#89919A'}"
-                                                    size="1rem" class="sapUiTinyMarginEnd"/>
-                                                <Text
-                                                    text="{= ${vm>status} === 'ACTIVE'      ? 'Active'      :
-                                                              ${vm>status} === 'PROMOTED'    ? 'Promoted'    :
-                                                              ${vm>status} === 'ROLLED_BACK' ? 'Rolled Back' : ${vm>status}}"
-                                                    class="{= ${vm>status} === 'ROLLED_BACK' ? 'sapThemeNegativeText' : ''}"/>
-                                            </HBox>
+                                            <ObjectStatus
+                                                text="{= ${vm>status} === 'ACTIVE'      ? 'Active'      :
+                                                          ${vm>status} === 'APPROVED'    ? 'Approved'    :
+                                                          ${vm>status} === 'REJECTED'    ? 'Rejected'    :
+                                                          ${vm>status} === 'SUBMITTED'   ? 'Submitted'   :
+                                                          ${vm>status} === 'ROLLED_BACK' ? 'Rolled Back' :
+                                                          ${vm>status} === 'DRAFT'       ? 'Draft'       : ${vm>status}}"
+                                                state="{= ${vm>status} === 'ACTIVE'      ? 'Success'  :
+                                                          ${vm>status} === 'APPROVED'    ? 'Success'  :
+                                                          ${vm>status} === 'REJECTED'    ? 'Error'    :
+                                                          ${vm>status} === 'SUBMITTED'   ? 'Warning'  :
+                                                          ${vm>status} === 'ROLLED_BACK' ? 'Error'    : 'None'}"
+                                                inverted="{= ${vm>status} !== 'DRAFT'}"/>
 
-                                            <!-- Version -->
                                             <ObjectStatus
                                                 text="{vm>versionNo}"
                                                 state="Information"/>
 
-                                            <!-- Tên request -->
-                                            <Text text="{vm>reqTitle}" wrapping="true"/>
-
-                                            <!-- By -->
                                             <HBox alignItems="Center">
                                                 <core:Icon src="sap-icon://employee"
                                                            color="#89919A" size="0.85rem"
@@ -424,6 +517,7 @@
                                 </items>
 
                             </Table>
+                            </VBox><!-- end itadmin-content-zone -->
                         </VBox>
 
                     </content>

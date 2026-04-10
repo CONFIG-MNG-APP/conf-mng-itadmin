@@ -5,159 +5,65 @@
     xmlns:l="sap.ui.layout">
 
     <Dialog id="detailDialog"
-            title="Configuration Detail — REQ_ID: {detail>/reqId}"
-            contentWidth="68rem" contentHeight="auto"
+            title="{= ${detail>/confName} &amp;&amp; ${detail>/confName} !== '-' ? ${detail>/confName} : 'Configuration Detail'}"
+            contentWidth="72rem" contentHeight="auto"
             verticalScrolling="true" draggable="true" resizable="true">
 
         <content>
             <VBox class="sapUiSmallMargin">
 
                 <!-- ── Request Info ──────────────────────────────────────── -->
-                <Panel headerText="Request Info" expandable="false" class="sapUiTinyMarginBottom">
+                <Panel headerText="Thông tin Request" expandable="false" class="sapUiTinyMarginBottom">
                     <HBox wrap="Wrap" class="sapUiSmallMargin" alignItems="Start">
-                        <VBox class="sapUiSmallMarginEnd" width="7rem">
+                        <VBox class="sapUiMediumMarginEnd" width="6rem">
                             <Label text="Module" design="Bold"/>
-                            <Text text="{detail>/module}"/>
+                            <ObjectStatus
+                                text="{detail>/module}"
+                                state="{= ${detail>/module} === 'FI' ? 'Warning' :
+                                           ${detail>/module} === 'SD' ? 'Success' : 'Information'}"
+                                inverted="true"/>
                         </VBox>
-                        <VBox class="sapUiSmallMarginEnd" width="18rem">
-                            <Label text="Config" design="Bold"/>
-                            <Text text="{detail>/confName}"/>
-                        </VBox>
-                        <VBox class="sapUiSmallMarginEnd" width="10rem">
+                        <VBox class="sapUiMediumMarginEnd" width="10rem">
                             <Label text="Requested By" design="Bold"/>
-                            <Text text="{detail>/by}"/>
+                            <HBox alignItems="Center">
+                                <core:Icon src="sap-icon://employee" color="#89919A"
+                                           size="0.85rem" class="sapUiTinyMarginEnd"/>
+                                <Text text="{detail>/by}"/>
+                            </HBox>
                         </VBox>
-                        <VBox width="auto">
+                        <VBox class="sapUiMediumMarginEnd" width="8rem">
+                            <Label text="ENV hiện tại" design="Bold"/>
+                            <ObjectStatus
+                                text="{detail>/curEnv}"
+                                state="{= ${detail>/curEnv} === 'PRD' ? 'Success' :
+                                           ${detail>/curEnv} === 'QAS' ? 'Warning' : 'Information'}"
+                                inverted="true"/>
+                        </VBox>
+                        <VBox class="sapUiMediumMarginEnd">
                             <Label text="Reason" design="Bold"/>
-                            <Text text="{detail>/reason}" wrapping="true" width="16rem"/>
+                            <Text text="{= ${detail>/reason} &amp;&amp; ${detail>/reason} !== '-' ? ${detail>/reason} : '(không có)'}"
+                                  wrapping="true" width="16rem"/>
+                        </VBox>
+                        <VBox>
+                            <Label text="REQ_ID" design="Bold"/>
+                            <Text text="{detail>/reqId}" wrapping="false"
+                                  class="sapUiSmallText sapThemeNeutralText"/>
                         </VBox>
                     </HBox>
                 </Panel>
 
-                <!-- ── Promote Journey — Horizontal Stepper ─────────────── -->
-                <Panel headerText="Promote Journey" expandable="true" expanded="true"
-                    class="sapUiTinyMarginBottom">
-                    <VBox class="sapUiSmallMargin">
-
-                        <!-- Stepper: DEV ──> QAS ──> PRD -->
-                        <HBox alignItems="Start" justifyContent="Center"
-                              class="sapUiMediumMarginTopBottom">
-
-                            <!-- DEV node -->
-                            <VBox alignItems="Center" width="12rem">
-                                <core:Icon
-                                    src="{= ${detail>/devNode/current} ? 'sap-icon://circle-task-2' :
-                                              ${detail>/devNode/exists}  ? 'sap-icon://accept'       :
-                                              'sap-icon://circle-task'}"
-                                    color="{= ${detail>/devNode/current} ? '#0070F2' :
-                                               ${detail>/devNode/exists}  ? '#107E3E' : '#89919A'}"
-                                    size="2.2rem" class="sapUiTinyMarginBottom"/>
-                                <Text text="DEV" textAlign="Center"
-                                      class="sapUiBoldText sapUiTinyMarginBottom"/>
-                                <ObjectStatus
-                                    text="{detail>/devNode/label}"
-                                    visible="{detail>/devNode/exists}"
-                                    state="{= ${detail>/devNode/current} ? 'Information' : 'Success'}"
-                                    class="sapUiTinyMarginBottom"/>
-                                <ObjectStatus
-                                    text="{detail>/devNode/status}"
-                                    state="{detail>/devNode/statusState}"
-                                    visible="{detail>/devNode/exists}"
-                                    class="sapUiTinyMarginBottom"/>
-                                <Text text="{= 'By: ' + ${detail>/devNode/by}}"
-                                      visible="{detail>/devNode/exists}"
-                                      textAlign="Center" class="sapUiTinyMarginTop"/>
-                                <Text text="{detail>/devNode/at}"
-                                      visible="{detail>/devNode/exists}"
-                                      textAlign="Center"/>
-                            </VBox>
-
-                            <!-- Connector DEV → QAS -->
-                            <VBox alignItems="Center" justifyContent="Start"
-                                  width="5rem" class="sapUiSmallMarginTop">
-                                <core:Icon src="sap-icon://navigation-right-arrow"
-                                    size="1.6rem"
-                                    color="{= ${detail>/qasNode/exists} ? '#107E3E' : '#CCCCCC'}"/>
-                            </VBox>
-
-                            <!-- QAS node -->
-                            <VBox alignItems="Center" width="12rem">
-                                <core:Icon
-                                    src="{= ${detail>/qasNode/current} ? 'sap-icon://circle-task-2' :
-                                              ${detail>/qasNode/exists}  ? 'sap-icon://accept'       :
-                                              'sap-icon://circle-task'}"
-                                    color="{= ${detail>/qasNode/current} ? '#0070F2' :
-                                               ${detail>/qasNode/exists}  ? '#107E3E' : '#89919A'}"
-                                    size="2.2rem" class="sapUiTinyMarginBottom"/>
-                                <Text text="QAS" textAlign="Center"
-                                      class="sapUiBoldText sapUiTinyMarginBottom"/>
-                                <ObjectStatus
-                                    text="{detail>/qasNode/label}"
-                                    visible="{detail>/qasNode/exists}"
-                                    state="{= ${detail>/qasNode/current} ? 'Information' : 'Success'}"
-                                    class="sapUiTinyMarginBottom"/>
-                                <ObjectStatus
-                                    text="{detail>/qasNode/status}"
-                                    state="{detail>/qasNode/statusState}"
-                                    visible="{detail>/qasNode/exists}"
-                                    class="sapUiTinyMarginBottom"/>
-                                <Text text="{= 'By: ' + ${detail>/qasNode/by}}"
-                                      visible="{detail>/qasNode/exists}"
-                                      textAlign="Center" class="sapUiTinyMarginTop"/>
-                                <Text text="{detail>/qasNode/at}"
-                                      visible="{detail>/qasNode/exists}"
-                                      textAlign="Center"/>
-                            </VBox>
-
-                            <!-- Connector QAS → PRD -->
-                            <VBox alignItems="Center" justifyContent="Start"
-                                  width="5rem" class="sapUiSmallMarginTop">
-                                <core:Icon src="sap-icon://navigation-right-arrow"
-                                    size="1.6rem"
-                                    color="{= ${detail>/prdNode/exists} ? '#107E3E' : '#CCCCCC'}"/>
-                            </VBox>
-
-                            <!-- PRD node -->
-                            <VBox alignItems="Center" width="12rem">
-                                <core:Icon
-                                    src="{= ${detail>/prdNode/current} ? 'sap-icon://circle-task-2' :
-                                              ${detail>/prdNode/exists}  ? 'sap-icon://accept'       :
-                                              'sap-icon://circle-task'}"
-                                    color="{= ${detail>/prdNode/current} ? '#0070F2' :
-                                               ${detail>/prdNode/exists}  ? '#107E3E' : '#89919A'}"
-                                    size="2.2rem" class="sapUiTinyMarginBottom"/>
-                                <Text text="PRD" textAlign="Center"
-                                      class="sapUiBoldText sapUiTinyMarginBottom"/>
-                                <ObjectStatus
-                                    text="{detail>/prdNode/label}"
-                                    visible="{detail>/prdNode/exists}"
-                                    state="{= ${detail>/prdNode/current} ? 'Information' : 'Success'}"
-                                    class="sapUiTinyMarginBottom"/>
-                                <ObjectStatus
-                                    text="{detail>/prdNode/status}"
-                                    state="{detail>/prdNode/statusState}"
-                                    visible="{detail>/prdNode/exists}"
-                                    class="sapUiTinyMarginBottom"/>
-                                <Text text="{= 'By: ' + ${detail>/prdNode/by}}"
-                                      visible="{detail>/prdNode/exists}"
-                                      textAlign="Center" class="sapUiTinyMarginTop"/>
-                                <Text text="{detail>/prdNode/at}"
-                                      visible="{detail>/prdNode/exists}"
-                                      textAlign="Center"/>
-                                <Button text="↩ Rollback PRD"
-                                        type="Reject"
-                                        icon="sap-icon://undo"
-                                        visible="{detail>/prdNode/current}"
-                                        class="sapUiTinyMarginTop"
-                                        press=".onNodeRollbackPress">
-                                    <customData>
-                                        <core:CustomData key="env" value="PRD"/>
-                                    </customData>
-                                </Button>
-                            </VBox>
-
-                        </HBox>
-                    </VBox>
+                <!-- ── Promote Journey ────────────────────────────────────── -->
+                <Panel expandable="true" expanded="true" class="sapUiTinyMarginBottom">
+                    <headerToolbar>
+                        <Toolbar style="Clear">
+                            <core:Icon src="sap-icon://journey-arrive" color="#0070F2"
+                                       size="1rem" class="sapUiTinyMarginEnd"/>
+                            <Title text="Promote Journey" level="H4"/>
+                        </Toolbar>
+                    </headerToolbar>
+                    <!-- Journey được render bởi controller -->
+                    <HBox id="journeyContainer" alignItems="Center" justifyContent="Center"
+                          class="sapUiSmallMargin"/>
                 </Panel>
 
                 <!-- ── Rollback Confirm Panel — hiện khi user click ↩ Rollback trên node ── -->
@@ -207,47 +113,9 @@
                         </Toolbar>
                     </headerToolbar>
 
-                    <Table id="previewTable" inset="false"
-                           noDataText="Loading..."
-                           items="{detail>/linesDisplay}">
-                        <columns>
-                            <Column width="14rem"><Text text="Key Info"/></Column>
-                            <Column width="9rem"><Text text="Field"/></Column>
-                            <Column><Text text="Giá trị cũ"/></Column>
-                            <Column><Text text="Giá trị mới"/></Column>
-                            <Column width="8rem" hAlign="Center"><Text text="Trạng thái"/></Column>
-                        </columns>
-                        <items>
-                            <ColumnListItem
-                                highlight="{= ${detail>changed} ? 'Warning' : 'None'}">
-                                <cells>
-                                    <Text text="{detail>keyInfo}" wrapping="true"/>
-                                    <Text text="{detail>field}"/>
+                    <!-- Bảng dynamic — columns được build bởi controller qua _buildPreviewTable() -->
+                    <VBox id="previewTableContainer"/>
 
-                                    <!-- Giá trị cũ: đỏ nếu bị thay đổi -->
-                                    <ObjectStatus
-                                        text="{= ${detail>oldVal} !== '' ? ${detail>oldVal} : '(trống)'}"
-                                        state="{= ${detail>changed} ? 'Error' : 'None'}"/>
-
-                                    <!-- Giá trị mới: xanh nếu được thay đổi -->
-                                    <ObjectStatus
-                                        text="{= ${detail>newVal} !== '' ? ${detail>newVal} : '(trống)'}"
-                                        state="{= ${detail>changed} ? 'Success' : 'None'}"/>
-
-                                    <!-- Trạng thái -->
-                                    <HBox alignItems="Center" justifyContent="Center">
-                                        <core:Icon
-                                            src="{= ${detail>changed} ? 'sap-icon://message-warning' : 'sap-icon://accept'}"
-                                            color="{= ${detail>changed} ? '#E9730C' : '#107E3E'}"
-                                            size="0.9rem" class="sapUiTinyMarginEnd"/>
-                                        <Text
-                                            text="{= ${detail>changed} ? 'Thay đổi' : 'Không đổi'}"
-                                            class="{= ${detail>changed} ? 'sapThemeNegativeText' : ''}"/>
-                                    </HBox>
-                                </cells>
-                            </ColumnListItem>
-                        </items>
-                    </Table>
                 </Panel>
 
             </VBox>

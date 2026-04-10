@@ -3,7 +3,7 @@
     xmlns:core="sap.ui.core">
 
     <Dialog title="IT Admin — Environment Comparison"
-            contentWidth="56rem" contentHeight="36rem"
+            contentWidth="72rem" contentHeight="42rem"
             draggable="true" resizable="true">
 
         <content>
@@ -34,7 +34,7 @@
                     </VBox>
                     <VBox class="sapUiSmallMarginEnd">
                         <Label text="vs"/>
-                        <Select id="cmpEnv2" width="8rem" selectedKey="QAS">
+                        <Select id="cmpEnv2" width="8rem" selectedKey="PRD">
                             <items>
                                 <core:Item key="DEV" text="DEV"/>
                                 <core:Item key="QAS" text="QAS"/>
@@ -43,37 +43,44 @@
                         </Select>
                     </VBox>
                     <Button text="Compare" icon="sap-icon://compare" type="Emphasized"
-                            press=".onEnvCompareRun" class="sapUiTinyMarginBottom"/>
+                            press=".onEnvCompareRun"
+                            class="sapUiTinyMarginBottom sapUiSmallMarginEnd"/>
+                    <VBox justifyContent="End" class="sapUiTinyMarginBottom">
+                        <HBox alignItems="Center">
+                            <Label text="Diffs only" class="sapUiTinyMarginEnd"/>
+                            <Switch state="{cmp>/diffsOnly}" change=".onEnvCompareDiffsOnly"/>
+                        </HBox>
+                    </VBox>
                 </HBox>
 
-                <HBox class="sapUiMediumMarginBottom"/>
+                <!-- Summary -->
+                <Text text="{cmp>/summary}" class="sapUiTinyMarginBottom"/>
 
                 <!-- Result Table -->
                 <Table inset="false"
                        noDataText="Select a config and two environments, then press Compare."
-                       items="{cmp>/rows}">
+                       items="{cmp>/rows}"
+                       sticky="ColumnHeaders"
+                       growing="true" growingThreshold="100">
                     <columns>
-                        <Column width="14rem"><Text text="Field"/></Column>
+                        <Column width="20rem"><Text text="Key"/></Column>
+                        <Column width="9rem"><Text text="Field"/></Column>
                         <Column><Text text="{cmp>/env1Label}"/></Column>
                         <Column><Text text="{cmp>/env2Label}"/></Column>
-                        <Column width="12rem"><Text text="Status"/></Column>
+                        <Column width="11rem"><Text text="Status"/></Column>
                     </columns>
                     <items>
-                        <ColumnListItem>
+                        <ColumnListItem highlight="{cmp>statusState}">
                             <cells>
-                                <Label text="{cmp>field}"/>
-                                <Text text="{cmp>val1}"/>
-                                <Text text="{cmp>val2}"/>
-                                <ObjectStatus
-                                    text="{cmp>status}"
-                                    state="{= ${cmp>status} === 'Same' ? 'Success' : 'Warning'}"/>
+                                <Text text="{cmp>keyInfo}" wrapping="false"/>
+                                <Text text="{cmp>field}"/>
+                                <ObjectStatus text="{cmp>val1}" state="{cmp>val1State}"/>
+                                <ObjectStatus text="{cmp>val2}" state="{cmp>val2State}"/>
+                                <ObjectStatus text="{cmp>status}" state="{cmp>statusState}"/>
                             </cells>
                         </ColumnListItem>
                     </items>
                 </Table>
-
-                <!-- Summary -->
-                <Text text="{cmp>/summary}" class="sapUiSmallMarginTop"/>
 
             </VBox>
         </content>
