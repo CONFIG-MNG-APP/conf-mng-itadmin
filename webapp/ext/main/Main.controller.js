@@ -934,6 +934,38 @@ sap.ui.define(
         }
       },
 
+      // ─── Email notification (fire-and-forget) ────────────────────────────────
+      // Sends notification to external mail-service on Render.com.
+      // Failures are silently ignored and do NOT affect app logic.
+
+      _MAIL_SERVICE_URL: "https://abap19-mail-206.onrender.com/api/notify",
+      _MAIL_SERVICE_KEY: "abap19-mail-secret-key-change-me",
+
+      _sendMailNotification: function (oPayload) {
+        try {
+          fetch(this._MAIL_SERVICE_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": this._MAIL_SERVICE_KEY
+            },
+            body: JSON.stringify(oPayload || {})
+          }).catch(function () { /* silently ignore */ });
+        } catch (e) { /* silently ignore */ }
+      },
+
+      _getCurrentUser: function () {
+        try {
+          if (sap && sap.ushell && sap.ushell.Container) {
+            var oService = sap.ushell.Container.getService("UserInfo");
+            if (oService && oService.getUser) {
+              return oService.getUser().getId() || "unknown";
+            }
+          }
+        } catch (e) { /* ignore */ }
+        return "unknown";
+      },
+
       // ─── Rollback order validation ────────────────────────────────────────────
 
       _checkRollbackOrder: async function (sReqId, sCurrentEnv) {
@@ -1275,6 +1307,17 @@ sap.ui.define(
         oView.setBusy(true);
         try {
           await this._execBoundAction(sReqId, sEnvId, "rollback");
+
+          // === Email notification (fire-and-forget) ===
+          this._sendMailNotification({
+            event: "ROLLED_BACK",
+            reqId: sReqId,
+            reqTitle: this._oCurrentItem.ReqTitle || sReqId,
+            module: this._oCurrentItem.ModuleId || "",
+            envId: sEnvId,
+            triggeredBy: this._getCurrentUser()
+          });
+
           this._aCachedAll = null;
           this._loadRequests();
           MessageBox.success("Đã rollback thành công — ENV: " + sEnvId + ".");
@@ -1328,6 +1371,17 @@ sap.ui.define(
               oView.setBusy(true);
               try {
                 await this._execBoundAction(sReqId, sEnvId, "rollback");
+
+                // === Email notification (fire-and-forget) ===
+                this._sendMailNotification({
+                  event: "ROLLED_BACK",
+                  reqId: sReqId,
+                  reqTitle: oItem.ReqTitle || sReqId,
+                  module: oItem.ModuleId || "",
+                  envId: sEnvId,
+                  triggeredBy: this._getCurrentUser()
+                });
+
                 this._aCachedAll = null;
                 this._loadRequests();
                 MessageBox.success("Đã rollback thành công — ENV: " + sEnvId + ".");
@@ -1368,6 +1422,17 @@ sap.ui.define(
               oView.setBusy(true);
               try {
                 await this._execBoundAction(oItem.ReqId, sCurEnv, "promote");
+
+                // === Email notification (fire-and-forget) ===
+                this._sendMailNotification({
+                  event: "PROMOTED",
+                  reqId: oItem.ReqId,
+                  reqTitle: oItem.ReqTitle || oItem.ReqId,
+                  module: oItem.ModuleId || "",
+                  envId: sNextEnv,
+                  triggeredBy: this._getCurrentUser()
+                });
+
                 this._aCachedAll = null;
                 this._loadRequests();
                 MessageBox.success("Đã promote thành công lên " + sNextEnv + ".");
