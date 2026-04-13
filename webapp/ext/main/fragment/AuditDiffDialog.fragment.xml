@@ -1,0 +1,133 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:l="sap.ui.layout">
+
+    <Dialog id="auditDiffDialog"
+            title="{diff>/title}"
+            contentWidth="52rem" contentHeight="auto"
+            verticalScrolling="true" draggable="true" resizable="true">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+
+                <!-- ── Context badges ──────────────────────────────────── -->
+                <HBox wrap="Wrap" alignItems="Center" class="sapUiTinyMarginBottom">
+
+                    <ObjectStatus
+                        text="{= ${diff>/actionType} === 'APPROVE'  ? 'Approve'  :
+                                  ${diff>/actionType} === 'PROMOTE'  ? 'Promote'  :
+                                  ${diff>/actionType} === 'ROLLBACK' ? 'Rollback' : ${diff>/actionType}}"
+                        state="{= ${diff>/actionType} === 'APPROVE'  ? 'Success' :
+                                  ${diff>/actionType} === 'PROMOTE'  ? 'Warning' :
+                                  ${diff>/actionType} === 'ROLLBACK' ? 'Error'   : 'None'}"
+                        inverted="true"
+                        class="sapUiSmallMarginEnd"/>
+
+                    <ObjectStatus
+                        text="{diff>/moduleId}"
+                        state="{= ${diff>/moduleId} === 'FI' ? 'Warning' :
+                                   ${diff>/moduleId} === 'SD' ? 'Success' : 'Information'}"
+                        inverted="true"
+                        class="sapUiSmallMarginEnd"/>
+
+                    <ObjectStatus
+                        text="{diff>/envId}"
+                        state="{= ${diff>/envId} === 'PRD' ? 'Success' :
+                                   ${diff>/envId} === 'QAS' ? 'Warning' : 'Information'}"
+                        inverted="true"
+                        class="sapUiSmallMarginEnd"/>
+
+                    <core:Icon src="sap-icon://database" size="0.85rem"
+                               color="#89919A" class="sapUiTinyMarginEnd"/>
+                    <Text text="{diff>/tableName}" class="sapUiSmallText sapUiSmallMarginEnd"/>
+
+                    <core:Icon src="sap-icon://employee" size="0.85rem"
+                               color="#89919A" class="sapUiTinyMarginEnd"/>
+                    <Text text="{diff>/changedBy}" class="sapUiSmallText sapUiSmallMarginEnd"/>
+
+                    <core:Icon src="sap-icon://appointment" size="0.85rem"
+                               color="#89919A" class="sapUiTinyMarginEnd"/>
+                    <Text text="{diff>/changedAt}" class="sapUiSmallText"/>
+
+                </HBox>
+
+                <Text text="{diff>/reqTitle}"
+                      class="sapUiBoldText sapUiTinyMarginBottom"
+                      wrapping="false" maxLines="1"/>
+
+                <!-- ── Diff columns ────────────────────────────────────── -->
+                <l:Grid defaultSpan="L6 M6 S12" class="sapUiTinyMarginTop">
+                    <l:content>
+
+                        <!-- OLD -->
+                        <Panel class="sapUiTinyMarginEnd">
+                            <headerToolbar>
+                                <Toolbar style="Clear" height="2rem">
+                                    <core:Icon src="sap-icon://decline"
+                                               color="#BB0000" size="0.9rem"
+                                               class="sapUiTinyMarginEnd"/>
+                                    <Title text="Giá trị cũ" level="H5"/>
+                                </Toolbar>
+                            </headerToolbar>
+                            <Table items="{diff>/oldFields}"
+                                   showSeparators="Inner"
+                                   noDataText="(không có dữ liệu)">
+                                <columns>
+                                    <Column width="10rem"><Text text="Trường"/></Column>
+                                    <Column><Text text="Giá trị"/></Column>
+                                </columns>
+                                <items>
+                                    <ColumnListItem highlight="{= ${diff>changed} ? 'Error' : 'None'}">
+                                        <cells>
+                                            <Text text="{diff>field}" class="sapUiSmallText sapThemeNeutralText"/>
+                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(trống)'}"
+                                                  class="{= ${diff>changed} ? 'sapThemeNegativeText' : ''}"/>
+                                        </cells>
+                                    </ColumnListItem>
+                                </items>
+                            </Table>
+                        </Panel>
+
+                        <!-- NEW -->
+                        <Panel>
+                            <headerToolbar>
+                                <Toolbar style="Clear" height="2rem">
+                                    <core:Icon src="sap-icon://accept"
+                                               color="#107E3E" size="0.9rem"
+                                               class="sapUiTinyMarginEnd"/>
+                                    <Title text="Giá trị mới" level="H5"/>
+                                </Toolbar>
+                            </headerToolbar>
+                            <Table items="{diff>/newFields}"
+                                   showSeparators="Inner"
+                                   noDataText="(không có dữ liệu)">
+                                <columns>
+                                    <Column width="10rem"><Text text="Trường"/></Column>
+                                    <Column><Text text="Giá trị"/></Column>
+                                </columns>
+                                <items>
+                                    <ColumnListItem highlight="{= ${diff>changed} ? 'Success' : 'None'}">
+                                        <cells>
+                                            <Text text="{diff>field}" class="sapUiSmallText sapThemeNeutralText"/>
+                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(trống)'}"
+                                                  class="{= ${diff>changed} ? 'sapThemePositiveText' : ''}"/>
+                                        </cells>
+                                    </ColumnListItem>
+                                </items>
+                            </Table>
+                        </Panel>
+
+                    </l:content>
+                </l:Grid>
+
+            </VBox>
+        </content>
+
+        <buttons>
+            <Button text="Đóng" press=".onAuditDiffClose"/>
+        </buttons>
+
+    </Dialog>
+
+</core:FragmentDefinition>

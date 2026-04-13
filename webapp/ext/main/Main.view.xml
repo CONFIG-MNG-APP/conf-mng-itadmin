@@ -381,16 +381,14 @@
                                     </items>
                                 </Select>
 
-                                <Label text="Status:" class="sapUiSmallMarginBegin"/>
-                                <Select id="auditStatusFilter" width="11rem"
+                                <Label text="Action:" class="sapUiSmallMarginBegin"/>
+                                <Select id="auditActionFilter" width="10rem"
                                         selectedKey="" change=".onAuditFilter">
                                     <items>
-                                        <core:Item key=""            text="Tất cả"/>
-                                        <core:Item key="SUBMITTED"   text="Submitted"/>
-                                        <core:Item key="APPROVED"    text="Approved"/>
-                                        <core:Item key="REJECTED"    text="Rejected"/>
-                                        <core:Item key="ACTIVE"      text="Active"/>
-                                        <core:Item key="ROLLED_BACK" text="Rolled Back"/>
+                                        <core:Item key=""         text="Tất cả"/>
+                                        <core:Item key="APPROVE"  text="Approve"/>
+                                        <core:Item key="PROMOTE"  text="Promote"/>
+                                        <core:Item key="ROLLBACK" text="Rollback"/>
                                     </items>
                                 </Select>
 
@@ -434,21 +432,20 @@
                                     <Column width="7rem"><Text text="Module"/></Column>
                                     <Column><Text text="Tên Request"/></Column>
                                     <Column width="7rem"><Text text="ENV"/></Column>
-                                    <Column width="10rem"><Text text="Status"/></Column>
-                                    <Column width="7rem"><Text text="Version"/></Column>
+                                    <Column width="9rem"><Text text="Action"/></Column>
+                                    <Column width="11rem"><Text text="Config Table"/></Column>
                                     <Column width="10rem"><Text text="Thực hiện bởi"/></Column>
+                                    <Column width="5rem" hAlign="Center"><Text text="Diff"/></Column>
                                 </columns>
 
                                 <items>
                                     <ColumnListItem
-                                        highlight="{= ${vm>status} === 'ROLLED_BACK' ? 'Error'   :
-                                                      ${vm>status} === 'REJECTED'    ? 'Error'   :
-                                                      ${vm>status} === 'ACTIVE'      ? 'Success' :
-                                                      ${vm>status} === 'APPROVED'    ? 'Success' :
-                                                      ${vm>status} === 'SUBMITTED'   ? 'Warning' : 'None'}">
+                                        highlight="{= ${vm>actionType} === 'ROLLBACK' ? 'Error'   :
+                                                      ${vm>actionType} === 'PROMOTE'  ? 'Warning' :
+                                                      ${vm>actionType} === 'APPROVE'  ? 'Success' : 'None'}">
                                         <cells>
 
-                                            <Text text="{vm>createdAt}"/>
+                                            <Text text="{vm>changedAt}"/>
 
                                             <ObjectStatus
                                                 text="{vm>moduleId}"
@@ -470,27 +467,30 @@
                                                 inverted="true"/>
 
                                             <ObjectStatus
-                                                text="{= ${vm>status} === 'ACTIVE'      ? 'Active'      :
-                                                          ${vm>status} === 'APPROVED'    ? 'Approved'    :
-                                                          ${vm>status} === 'REJECTED'    ? 'Rejected'    :
-                                                          ${vm>status} === 'SUBMITTED'   ? 'Submitted'   :
-                                                          ${vm>status} === 'ROLLED_BACK' ? 'Rolled Back' :
-                                                          ${vm>status} === 'DRAFT'       ? 'Draft'       : ${vm>status}}"
-                                                state="{= ${vm>status} === 'ACTIVE'      ? 'Success'  :
-                                                          ${vm>status} === 'APPROVED'    ? 'Success'  :
-                                                          ${vm>status} === 'REJECTED'    ? 'Error'    :
-                                                          ${vm>status} === 'SUBMITTED'   ? 'Warning'  :
-                                                          ${vm>status} === 'ROLLED_BACK' ? 'Error'    : 'None'}"
-                                                inverted="{= ${vm>status} !== 'DRAFT'}"/>
+                                                text="{= ${vm>actionType} === 'APPROVE'  ? 'Approve'  :
+                                                          ${vm>actionType} === 'PROMOTE'  ? 'Promote'  :
+                                                          ${vm>actionType} === 'ROLLBACK' ? 'Rollback' : ${vm>actionType}}"
+                                                state="{= ${vm>actionType} === 'APPROVE'  ? 'Success' :
+                                                          ${vm>actionType} === 'PROMOTE'  ? 'Warning' :
+                                                          ${vm>actionType} === 'ROLLBACK' ? 'Error'   : 'None'}"
+                                                inverted="true"/>
 
-                                            <ObjectStatus text="{vm>versionNo}" state="Information"/>
+                                            <Text text="{vm>tableName}"
+                                                  class="sapUiSmallText"/>
 
                                             <HBox alignItems="Center">
                                                 <core:Icon src="sap-icon://employee"
                                                            color="#89919A" size="0.85rem"
                                                            class="sapUiTinyMarginEnd"/>
-                                                <Text text="{vm>createdBy}"/>
+                                                <Text text="{vm>changedBy}"/>
                                             </HBox>
+
+                                            <Button
+                                                icon="sap-icon://detail-view"
+                                                type="Transparent"
+                                                tooltip="Xem thay đổi old / new"
+                                                visible="{= !!${vm>oldData} || !!${vm>newData}}"
+                                                press=".onAuditDiffPress"/>
 
                                         </cells>
                                     </ColumnListItem>

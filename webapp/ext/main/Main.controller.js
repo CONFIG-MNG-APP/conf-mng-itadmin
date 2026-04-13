@@ -11,6 +11,7 @@ sap.ui.define(
 
     // ─── OData service base URL ───────────────────────────────────────────────
     const _BASE_URL    = "/sap/opu/odata4/sap/zui_conf_req/srvd/sap/zsd_conf_req/0001/";
+    const _AUDIT_URL   = "/sap/opu/odata4/sap/zui_audit_log/srvd/sap/zsd_audit_log/0001/AuditLog";
     const _FETCH_HDR   = { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" };
     const _ENV_ORDER   = { DEV: 1, QAS: 2, PRD: 3 };
 
@@ -569,47 +570,41 @@ sap.ui.define(
         const oView = this.getView();
         oView.setBusy(true);
         try {
-          // Step 1: ReqId → {moduleId, versionNo} từ bảng chính (url) của từng module
-          // Dùng url (main table) thay vì reqUrl (req table) vì reqUrl luôn có VersionNo=1
-          const oReqMap = {};
-          const aModFetches = Object.keys(_SERVICES).map(async function (sKey) {
-            try {
-              const oResp = await fetch(
-                _SERVICES[sKey].url + "?$select=ReqId,VersionNo&$top=5000",
-                { headers: _FETCH_HDR }
-              );
-              if (!oResp.ok) return;
-              ((await oResp.json()).value || []).forEach(function (item) {
-                if (!item.ReqId) return;
-                const cur = oReqMap[item.ReqId];
-                if (!cur || (item.VersionNo || 0) > (cur.versionNo || 0)) {
-                  oReqMap[item.ReqId] = { moduleId: sKey, versionNo: item.VersionNo || 0 };
-                }
+          // Step 1: Lấy ReqTitle từ ZC_CONF_REQ_H để join vào log entries
+          const oReqTitleMap = {};
+          try {
+            const oHdrResp = await fetch(
+              _BASE_URL + "ZC_CONF_REQ_H?$select=ReqId,ReqTitle&$top=5000",
+              { headers: _FETCH_HDR }
+            );
+            if (oHdrResp.ok) {
+              ((await oHdrResp.json()).value || []).forEach(function (h) {
+                if (h.ReqId) oReqTitleMap[h.ReqId] = h.ReqTitle || "-";
               });
-            } catch (e) { console.warn("Audit module " + sKey, e); }
-          });
-          await Promise.all(aModFetches);
+            }
+          } catch (e) { console.warn("Header title fetch failed", e); }
 
-          // Step 2: toàn bộ ZC_CONF_REQ_H (all statuses, sort mới nhất lên trước)
-          const sUrl = _BASE_URL + "ZC_CONF_REQ_H" +
-            "?$select=ReqId,EnvId,Status,CreatedBy,CreatedAt,ReqTitle" +
-            "&$orderby=CreatedAt desc&$top=2000";
-          const oResp = await fetch(sUrl, { headers: _FETCH_HDR });
-          if (!oResp.ok) throw new Error("ZC_CONF_REQ_H fetch failed");
-          const aHdrs = (await oResp.json()).value || [];
+          // Step 2: Lấy audit log thực sự từ ZAUDITLOG (chỉ có APPROVE/PROMOTE/ROLLBACK)
+          const sAuditUrl = _AUDIT_URL + "?$orderby=ChangedAt desc&$top=2000";
+          const oAuditResp = await fetch(sAuditUrl, { headers: _FETCH_HDR });
+          if (!oAuditResp.ok) throw new Error("AuditLog fetch failed");
+          const aLogs = (await oAuditResp.json()).value || [];
 
-          // Step 3: join + map sang audit entries
-          const aAudit = aHdrs.map(function (h) {
-            const oMod = oReqMap[h.ReqId] || {};
+          // Step 3: Map sang display model
+          const aAudit = aLogs.map(function (log) {
             return {
-              reqId:     h.ReqId      || "-",
-              envId:     h.EnvId      || "-",
-              status:    h.Status     || "-",
-              createdBy: h.CreatedBy  || "-",
-              createdAt: _formatDate(h.CreatedAt),
-              reqTitle:  h.ReqTitle   || "-",
-              moduleId:  oMod.moduleId  || "?",
-              versionNo: oMod.versionNo != null ? "v." + oMod.versionNo : "-",
+              logId:      log.LogId      || "-",
+              reqId:      log.ReqId      || "-",
+              moduleId:   log.ModuleId   || "?",
+              actionType: log.ActionType || "-",
+              envId:      log.EnvId      || "-",
+              changedBy:  log.ChangedBy  || "-",
+              changedAt:  _formatDate(log.ChangedAt),
+              tableName:  log.TableName  || "-",
+              oldData:    log.OldData    || "",
+              newData:    log.NewData    || "",
+              objectKey:  log.ObjectKey  || "-",
+              reqTitle:   oReqTitleMap[log.ReqId] || "-",
             };
           });
 
@@ -633,15 +628,16 @@ sap.ui.define(
         const sEnv = this.byId("auditEnvFilter").getSelectedKey();
         if (sEnv) aResult = aResult.filter(function (i) { return i.envId === sEnv; });
 
-        const sStatus = this.byId("auditStatusFilter").getSelectedKey();
-        if (sStatus) aResult = aResult.filter(function (i) { return i.status === sStatus; });
+        const sAction = this.byId("auditActionFilter").getSelectedKey();
+        if (sAction) aResult = aResult.filter(function (i) { return i.actionType === sAction; });
 
         const sQuery = (this.byId("auditSearch").getValue() || "").toLowerCase();
         if (sQuery) {
           aResult = aResult.filter(function (i) {
-            return (i.reqId    || "").toLowerCase().includes(sQuery) ||
-                   (i.createdBy|| "").toLowerCase().includes(sQuery) ||
-                   (i.reqTitle || "").toLowerCase().includes(sQuery);
+            return (i.reqId     || "").toLowerCase().includes(sQuery) ||
+                   (i.changedBy || "").toLowerCase().includes(sQuery) ||
+                   (i.reqTitle  || "").toLowerCase().includes(sQuery) ||
+                   (i.tableName || "").toLowerCase().includes(sQuery);
           });
         }
 
@@ -654,12 +650,77 @@ sap.ui.define(
       onAuditClearFilter: function () {
         this.byId("auditModuleFilter").setSelectedKey("");
         this.byId("auditEnvFilter").setSelectedKey("");
-        this.byId("auditStatusFilter").setSelectedKey("");
+        this.byId("auditActionFilter").setSelectedKey("");
         this.byId("auditSearch").setValue("");
         this._applyAuditFilters();
       },
 
       onAuditRefresh: function () { this._loadAuditTrail(); },
+
+      onAuditDiffPress: async function (oEvent) {
+        const oCtx  = oEvent.getSource().getParent().getBindingContext("vm");
+        const oItem = oCtx.getObject();
+
+        // Parse JSON → mảng {field, value, changed}
+        var _parseFields = function (sJson) {
+          if (!sJson) return [];
+          try {
+            var oData = JSON.parse(sJson);
+            return Object.keys(oData).map(function (k) {
+              return { field: k, value: oData[k] != null ? String(oData[k]) : "", changed: false };
+            });
+          } catch (e) {
+            return [{ field: "raw", value: sJson, changed: false }];
+          }
+        };
+
+        var aOld = _parseFields(oItem.oldData);
+        var aNew = _parseFields(oItem.newData);
+
+        // Đánh dấu field nào thay đổi giữa old và new
+        var oOldMap = {};
+        aOld.forEach(function (r) { oOldMap[r.field] = r.value; });
+        aNew.forEach(function (r) { r.changed = (oOldMap[r.field] !== r.value); });
+        var oNewMap = {};
+        aNew.forEach(function (r) { oNewMap[r.field] = r.value; });
+        aOld.forEach(function (r) { r.changed = (oNewMap[r.field] !== r.value); });
+
+        // Nếu new không có field → thêm placeholder để căn hàng
+        var aNewFields = Object.keys(oNewMap);
+        aOld.forEach(function (r) {
+          if (!aNewFields.includes(r.field)) {
+            aNew.push({ field: r.field, value: "", changed: true });
+          }
+        });
+
+        const oDiffModel = new JSONModel({
+          title:      "Diff · " + (oItem.tableName || "-"),
+          actionType: oItem.actionType || "-",
+          moduleId:   oItem.moduleId   || "-",
+          envId:      oItem.envId      || "-",
+          tableName:  oItem.tableName  || "-",
+          changedBy:  oItem.changedBy  || "-",
+          changedAt:  oItem.changedAt  || "-",
+          reqTitle:   oItem.reqTitle   || "-",
+          oldFields:  aOld,
+          newFields:  aNew,
+        });
+
+        if (!this._oAuditDiffDialog) {
+          this._oAuditDiffDialog = await Fragment.load({
+            id:         this.getView().getId(),
+            name:       "zgsp26.conf.mng.itadmin.ext.main.fragment.AuditDiffDialog",
+            controller: this,
+          });
+          this.getView().addDependent(this._oAuditDiffDialog);
+        }
+        this._oAuditDiffDialog.setModel(oDiffModel, "diff");
+        this._oAuditDiffDialog.open();
+      },
+
+      onAuditDiffClose: function () {
+        if (this._oAuditDiffDialog) this._oAuditDiffDialog.close();
+      },
 
       // ─── Row action → open dialog ─────────────────────────────────────────────
 
