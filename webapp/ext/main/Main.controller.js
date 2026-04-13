@@ -135,7 +135,7 @@ sap.ui.define(
           "notif"
         );
         this.getView().setModel(
-          new JSONModel({ rows: [], env1Label: "", env2Label: "", summary: "" }),
+          new JSONModel({ rows: [], allRows: [], diffsOnly: false, totalKeys: 0, diffCount: 0 }),
           "cmp"
         );
         // Load danh sách đã đọc từ localStorage
@@ -1525,6 +1525,12 @@ sap.ui.define(
       // ─── Environment Comparison ───────────────────────────────────────────────
 
       onEnvCompareOpen: function () {
+        const _reset = () => {
+          this.getView().getModel("cmp").setData({
+            rows: [], allRows: [], diffsOnly: false,
+            totalKeys: 0, diffCount: 0,
+          });
+        };
         if (!this._oEnvCompareDialog) {
           Fragment.load({
             id:         this.getView().getId(),
@@ -1533,134 +1539,146 @@ sap.ui.define(
           }).then((oDialog) => {
             this._oEnvCompareDialog = oDialog;
             this.getView().addDependent(oDialog);
-            // Reset result when opening
-            this.getView().getModel("cmp").setData({ rows: [], allRows: [], env1Label: "", env2Label: "", summary: "", diffsOnly: false });
+            _reset();
             oDialog.open();
           });
         } else {
-          this.getView().getModel("cmp").setData({ rows: [], allRows: [], env1Label: "", env2Label: "", summary: "", diffsOnly: false });
+          _reset();
           this._oEnvCompareDialog.open();
         }
       },
 
       onEnvCompareRun: async function () {
-        const sModule = this.byId("cmpModule").getSelectedKey();
-        const sEnv1   = this.byId("cmpEnv1").getSelectedKey();
-        const sEnv2   = this.byId("cmpEnv2").getSelectedKey();
+        const sModule   = this.byId("cmpModule").getSelectedKey();
         const oCmpModel = this.getView().getModel("cmp");
 
-        if (!sModule || !sEnv1 || !sEnv2) {
-          MessageToast.show("Please select a config and two environments.");
-          return;
-        }
-        if (sEnv1 === sEnv2) {
-          MessageToast.show("Please select two different environments.");
+        if (!sModule) {
+          MessageToast.show("Vui lòng chọn Config module.");
           return;
         }
 
         const oSvc = _SERVICES[sModule];
-        oCmpModel.setData({ rows: [], env1Label: sEnv1, env2Label: sEnv2, summary: "Loading..." });
+        oCmpModel.setProperty("/rows", []);
 
         try {
-          // Fetch both envs in parallel — use url (main config table, latest version per row)
-          const [oResp1, oResp2] = await Promise.all([
-            fetch(oSvc.url + "?$filter=" + encodeURIComponent("EnvId eq '" + sEnv1 + "'") + "&$top=500", { headers: _FETCH_HDR }),
-            fetch(oSvc.url + "?$filter=" + encodeURIComponent("EnvId eq '" + sEnv2 + "'") + "&$top=500", { headers: _FETCH_HDR }),
+          // Fetch DEV, QAS, PRD song song
+          const [oRDev, oRQas, oRPrd] = await Promise.all([
+            fetch(oSvc.url + "?$filter=" + encodeURIComponent("EnvId eq 'DEV'") + "&$top=500", { headers: _FETCH_HDR }),
+            fetch(oSvc.url + "?$filter=" + encodeURIComponent("EnvId eq 'QAS'") + "&$top=500", { headers: _FETCH_HDR }),
+            fetch(oSvc.url + "?$filter=" + encodeURIComponent("EnvId eq 'PRD'") + "&$top=500", { headers: _FETCH_HDR }),
           ]);
 
-          const aData1 = oResp1.ok ? ((await oResp1.json()).value || []) : [];
-          const aData2 = oResp2.ok ? ((await oResp2.json()).value || []) : [];
+          const _toMap = async function (oResp) {
+            const oMap = {};
+            if (!oResp.ok) return oMap;
+            ((await oResp.json()).value || []).forEach(function (item) {
+              const sKey = oSvc.keyFields.map(function (f) { return item[f] || ""; }).join("|");
+              if (!oMap[sKey] || (item.VersionNo || 0) > (oMap[sKey].VersionNo || 0)) {
+                oMap[sKey] = item;
+              }
+            });
+            return oMap;
+          };
 
-          // Build lookup map for env2: composite business key → record
-          const oMap2 = {};
-          aData2.forEach(function (item) {
-            const sKey = oSvc.keyFields.map(function (f) { return item[f] || ""; }).join("|");
-            // Keep the record with the highest VersionNo per business key
-            if (!oMap2[sKey] || (item.VersionNo || 0) > (oMap2[sKey].VersionNo || 0)) {
-              oMap2[sKey] = item;
-            }
+          const [oMapDev, oMapQas, oMapPrd] = await Promise.all([
+            _toMap(oRDev), _toMap(oRQas), _toMap(oRPrd),
+          ]);
+
+          // Union of all business keys across 3 envs
+          const oAllKeys = {};
+          [oMapDev, oMapQas, oMapPrd].forEach(function (oMap) {
+            Object.keys(oMap).forEach(function (k) { oAllKeys[k] = true; });
           });
 
-          // Build lookup map for env1 (also keep highest version per key)
-          const oMap1 = {};
-          aData1.forEach(function (item) {
-            const sKey = oSvc.keyFields.map(function (f) { return item[f] || ""; }).join("|");
-            if (!oMap1[sKey] || (item.VersionNo || 0) > (oMap1[sKey].VersionNo || 0)) {
-              oMap1[sKey] = item;
-            }
-          });
+          const aAllRows = [];
+          let iDiffRecords = 0;
 
-          const aRows = [];
-          let iDiff = 0;
+          Object.keys(oAllKeys).forEach(function (sKey) {
+            const oRec   = oMapDev[sKey] || oMapQas[sKey] || oMapPrd[sKey];
+            const sInfo  = oSvc.keyFields.map(function (f) { return oRec[f] || "-"; }).join(" / ");
+            const bHasDev = !!oMapDev[sKey];
+            const bHasQas = !!oMapQas[sKey];
+            const bHasPrd = !!oMapPrd[sKey];
 
-          // Compare env1 records against env2
-          Object.keys(oMap1).forEach(function (sKey) {
-            const oR1   = oMap1[sKey];
-            const oR2   = oMap2[sKey];
-            const sInfo = oSvc.keyFields.map(function (f) { return f + ": " + (oR1[f] || "-"); }).join(" | ");
-
+            // Tính sync status cho toàn record
+            let bRecordDiff = false;
             oSvc.diffFields.forEach(function (d) {
-              const sVal1  = oR1[d.field] != null ? String(oR1[d.field]) : "";
-              const sVal2  = oR2 ? (oR2[d.field] != null ? String(oR2[d.field]) : "") : "";
-              const bSame  = oR2 && sVal1 === sVal2;
-              const sStatus = bSame ? "Same" : (oR2 ? "Different" : "Only in " + sEnv1);
-              if (!bSame) iDiff++;
-              aRows.push({
-                keyInfo:    sInfo,
-                field:      d.field,
-                val1:       sVal1 || (sStatus === "Only in " + sEnv2 ? "—" : sVal1),
-                val2:       sVal2 || (sStatus === "Only in " + sEnv1 ? "—" : sVal2),
-                val1State:  bSame ? "None" : (oR2 ? "Warning" : "Success"),
-                val2State:  bSame ? "None" : (oR2 ? "Warning" : "Error"),
-                status:     sStatus,
-                statusState: bSame ? "Success" : (oR2 ? "Warning" : "Error"),
+              const sD = String(oMapDev[sKey]?.[d.field] ?? "");
+              const sQ = String(oMapQas[sKey]?.[d.field] ?? "");
+              const sP = String(oMapPrd[sKey]?.[d.field] ?? "");
+              if (sD !== sQ || sQ !== sP) bRecordDiff = true;
+            });
+            if (!bHasDev || !bHasQas || !bHasPrd) bRecordDiff = true;
+            if (bRecordDiff) iDiffRecords++;
+
+            const sSyncText  = bRecordDiff ? "Khác nhau" : "Đồng nhất";
+            const sSyncState = bRecordDiff ? "Warning"   : "Success";
+            const sRowHL     = bRecordDiff ? "Warning"   : "None";
+
+            // Build 1 row per diff field, mark _showKey only on first field
+            oSvc.diffFields.forEach(function (d, idx) {
+              const sDevVal = bHasDev ? String(oMapDev[sKey][d.field] ?? "") : "—";
+              const sQasVal = bHasQas ? String(oMapQas[sKey][d.field] ?? "") : "—";
+              const sPrdVal = bHasPrd ? String(oMapPrd[sKey][d.field] ?? "") : "—";
+
+              // Majority vote: giá trị nào xuất hiện nhiều nhất là "chuẩn"
+              // ENV có giá trị lệch → highlight Warning; ENV không tồn tại → Error
+              const aVals  = [sDevVal, sQasVal, sPrdVal].filter(function (v) { return v !== "—"; });
+              const sMode  = aVals.sort((a, b) =>
+                aVals.filter(v => v === b).length - aVals.filter(v => v === a).length
+              )[0];
+
+              const _state = function (sVal, bExists) {
+                if (!bExists) return "Error";
+                if (sVal === sMode) return "None";
+                return "Warning";
+              };
+
+              aAllRows.push({
+                keyInfo:      sInfo,
+                field:        d.field,
+                devVal:       sDevVal,
+                qasVal:       sQasVal,
+                prdVal:       sPrdVal,
+                devState:     _state(sDevVal, bHasDev),
+                qasState:     _state(sQasVal, bHasQas),
+                prdState:     _state(sPrdVal, bHasPrd),
+                _showKey:     idx === 0,
+                _syncText:    sSyncText,
+                _syncState:   sSyncState,
+                _rowHighlight: sRowHL,
+                _isDiff:      bRecordDiff,
               });
             });
           });
 
-          // Records only in env2 (not in env1)
-          Object.keys(oMap2).forEach(function (sKey) {
-            if (oMap1[sKey]) return;
-            const oR2   = oMap2[sKey];
-            const sInfo = oSvc.keyFields.map(function (f) { return f + ": " + (oR2[f] || "-"); }).join(" | ");
-            oSvc.diffFields.forEach(function (d) {
-              iDiff++;
-              aRows.push({
-                keyInfo:    sInfo,
-                field:      d.field,
-                val1:       "—",
-                val2:       oR2[d.field] != null ? String(oR2[d.field]) : "",
-                val1State:  "Error",
-                val2State:  "Success",
-                status:     "Only in " + sEnv2,
-                statusState: "Error",
-              });
-            });
+          // Sort: khác nhau lên trước, đồng nhất xuống sau
+          aAllRows.sort(function (a, b) {
+            if (a._isDiff === b._isDiff) return (a.keyInfo > b.keyInfo ? 1 : -1);
+            return a._isDiff ? -1 : 1;
           });
 
-          const iTotalKeys = Object.keys(oMap1).length + Object.keys(oMap2).filter(function (k) { return !oMap1[k]; }).length;
           const bDiffsOnly = oCmpModel.getProperty("/diffsOnly");
           oCmpModel.setData({
-            rows:      bDiffsOnly ? aRows.filter(function (r) { return r.status !== "Same"; }) : aRows,
-            allRows:   aRows,
-            env1Label: sEnv1,
-            env2Label: sEnv2,
+            rows:      bDiffsOnly ? aAllRows.filter(function (r) { return r._isDiff; }) : aAllRows,
+            allRows:   aAllRows,
             diffsOnly: bDiffsOnly,
-            summary:   iTotalKeys + " record(s) compared — " + iDiff + " difference(s) found.",
+            totalKeys: Object.keys(oAllKeys).length,
+            diffCount: iDiffRecords,
           });
 
         } catch (e) {
           console.error("EnvCompare failed:", e);
-          oCmpModel.setProperty("/summary", "Error loading data: " + (e.message || e));
+          MessageToast.show("Lỗi khi so sánh: " + (e.message || e));
         }
       },
 
       onEnvCompareDiffsOnly: function (oEvent) {
-        const bOn = oEvent.getParameter("state");
+        const bOn       = oEvent.getParameter("state");
         const oCmpModel = this.getView().getModel("cmp");
-        const aAll = oCmpModel.getProperty("/allRows") || [];
+        const aAll      = oCmpModel.getProperty("/allRows") || [];
         oCmpModel.setProperty("/diffsOnly", bOn);
-        oCmpModel.setProperty("/rows", bOn ? aAll.filter(function (r) { return r.status !== "Same"; }) : aAll);
+        oCmpModel.setProperty("/rows", bOn ? aAll.filter(function (r) { return r._isDiff; }) : aAll);
       },
 
       onEnvCompareClose: function () {

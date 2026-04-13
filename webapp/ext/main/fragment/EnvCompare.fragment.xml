@@ -3,17 +3,18 @@
     xmlns:core="sap.ui.core">
 
     <Dialog title="IT Admin — Environment Comparison"
-            contentWidth="72rem" contentHeight="42rem"
+            contentWidth="76rem" contentHeight="44rem"
             draggable="true" resizable="true">
 
         <content>
             <VBox class="sapUiSmallMargin">
 
-                <!-- Controls -->
+                <!-- ── Toolbar ──────────────────────────────────────────── -->
                 <HBox wrap="Wrap" alignItems="End" class="sapUiTinyMarginBottom">
+
                     <VBox class="sapUiSmallMarginEnd">
                         <Label text="Config"/>
-                        <Select id="cmpModule" width="14rem">
+                        <Select id="cmpModule" width="14rem" change=".onEnvCompareRun">
                             <items>
                                 <core:Item key="MM"   text="MM Route Config"/>
                                 <core:Item key="MMSS" text="MM Safe Stock"/>
@@ -22,71 +23,144 @@
                             </items>
                         </Select>
                     </VBox>
-                    <VBox class="sapUiSmallMarginEnd">
-                        <Label text="Compare"/>
-                        <Select id="cmpEnv1" width="8rem" selectedKey="DEV">
-                            <items>
-                                <core:Item key="DEV" text="DEV"/>
-                                <core:Item key="QAS" text="QAS"/>
-                                <core:Item key="PRD" text="PRD"/>
-                            </items>
-                        </Select>
-                    </VBox>
-                    <VBox class="sapUiSmallMarginEnd">
-                        <Label text="vs"/>
-                        <Select id="cmpEnv2" width="8rem" selectedKey="PRD">
-                            <items>
-                                <core:Item key="DEV" text="DEV"/>
-                                <core:Item key="QAS" text="QAS"/>
-                                <core:Item key="PRD" text="PRD"/>
-                            </items>
-                        </Select>
-                    </VBox>
+
                     <Button text="Compare" icon="sap-icon://compare" type="Emphasized"
                             press=".onEnvCompareRun"
                             class="sapUiTinyMarginBottom sapUiSmallMarginEnd"/>
+
                     <VBox justifyContent="End" class="sapUiTinyMarginBottom">
                         <HBox alignItems="Center">
-                            <Label text="Diffs only" class="sapUiTinyMarginEnd"/>
+                            <Label text="Chỉ hiện khác nhau" class="sapUiTinyMarginEnd"/>
                             <Switch state="{cmp>/diffsOnly}" change=".onEnvCompareDiffsOnly"/>
                         </HBox>
                     </VBox>
+
+                    <ToolbarSpacer/>
+
+                    <!-- Summary badges -->
+                    <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                        <ObjectStatus text="{cmp>/totalKeys} records"
+                                      icon="sap-icon://database"
+                                      state="None"
+                                      class="sapUiSmallMarginEnd"
+                                      visible="{= ${cmp>/totalKeys} > 0}"/>
+                        <ObjectStatus text="{cmp>/diffCount} khác nhau"
+                                      icon="sap-icon://warning2"
+                                      state="{= ${cmp>/diffCount} > 0 ? 'Warning' : 'Success'}"
+                                      inverted="{= ${cmp>/diffCount} > 0}"
+                                      visible="{= ${cmp>/totalKeys} > 0}"/>
+                    </HBox>
+
                 </HBox>
 
-                <!-- Summary -->
-                <Text text="{cmp>/summary}" class="sapUiTinyMarginBottom"/>
+                <!-- ── Legend ────────────────────────────────────────────── -->
+                <HBox alignItems="Center" class="sapUiTinyMarginBottom"
+                      visible="{= ${cmp>/totalKeys} > 0}">
+                    <ObjectStatus text="Đồng nhất" state="Success" inverted="true"
+                                  class="sapUiTinyMarginEnd"/>
+                    <ObjectStatus text="Khác nhau" state="Warning" inverted="true"
+                                  class="sapUiTinyMarginEnd"/>
+                    <ObjectStatus text="Chỉ ở 1 ENV" state="Error" inverted="true"
+                                  class="sapUiTinyMarginEnd"/>
+                    <Text text="· Giá trị bôi màu là giá trị lệch so với phần còn lại"
+                          class="sapUiSmallText sapThemeNeutralText"/>
+                </HBox>
 
-                <!-- Result Table -->
-                <Table inset="false"
-                       noDataText="Select a config and two environments, then press Compare."
+                <!-- ── Result Table ──────────────────────────────────────── -->
+                <Table id="cmpTable"
+                       inset="false"
+                       noDataText="Chọn module rồi bấm Compare."
                        items="{cmp>/rows}"
                        sticky="ColumnHeaders"
-                       growing="true" growingThreshold="100">
+                       growing="true" growingThreshold="200">
                     <columns>
-                        <Column width="20rem"><Text text="Key"/></Column>
-                        <Column width="9rem"><Text text="Field"/></Column>
-                        <Column><Text text="{cmp>/env1Label}"/></Column>
-                        <Column><Text text="{cmp>/env2Label}"/></Column>
-                        <Column width="11rem"><Text text="Status"/></Column>
+                        <Column width="18rem">
+                            <Text text="Record Key"/>
+                        </Column>
+                        <Column width="9rem">
+                            <Text text="Field"/>
+                        </Column>
+                        <Column>
+                            <HBox alignItems="Center">
+                                <core:Icon src="sap-icon://developer-settings"
+                                           color="#E9730C" size="0.8rem"
+                                           class="sapUiTinyMarginEnd"/>
+                                <Text text="DEV"/>
+                            </HBox>
+                        </Column>
+                        <Column>
+                            <HBox alignItems="Center">
+                                <core:Icon src="sap-icon://quality-issue"
+                                           color="#0070F2" size="0.8rem"
+                                           class="sapUiTinyMarginEnd"/>
+                                <Text text="QAS"/>
+                            </HBox>
+                        </Column>
+                        <Column>
+                            <HBox alignItems="Center">
+                                <core:Icon src="sap-icon://accept"
+                                           color="#107E3E" size="0.8rem"
+                                           class="sapUiTinyMarginEnd"/>
+                                <Text text="PRD"/>
+                            </HBox>
+                        </Column>
+                        <Column width="8rem" hAlign="Center">
+                            <Text text="Sync"/>
+                        </Column>
                     </columns>
+
                     <items>
-                        <ColumnListItem highlight="{cmp>statusState}">
+                        <ColumnListItem highlight="{cmp>_rowHighlight}">
                             <cells>
-                                <Text text="{cmp>keyInfo}" wrapping="false"/>
-                                <Text text="{cmp>field}"/>
-                                <ObjectStatus text="{cmp>val1}" state="{cmp>val1State}"/>
-                                <ObjectStatus text="{cmp>val2}" state="{cmp>val2State}"/>
-                                <ObjectStatus text="{cmp>status}" state="{cmp>statusState}"/>
+
+                                <!-- Key — chỉ hiện ở row đầu của mỗi record group -->
+                                <VBox>
+                                    <Text text="{cmp>keyInfo}"
+                                          wrapping="true"
+                                          visible="{cmp>_showKey}"
+                                          class="sapUiBoldText"/>
+                                </VBox>
+
+                                <!-- Field name -->
+                                <Text text="{cmp>field}"
+                                      class="sapUiSmallText sapThemeNeutralText"/>
+
+                                <!-- DEV value -->
+                                <ObjectStatus
+                                    text="{= ${cmp>devVal} || '—'}"
+                                    state="{cmp>devState}"
+                                    inverted="{= ${cmp>devState} !== 'None'}"/>
+
+                                <!-- QAS value -->
+                                <ObjectStatus
+                                    text="{= ${cmp>qasVal} || '—'}"
+                                    state="{cmp>qasState}"
+                                    inverted="{= ${cmp>qasState} !== 'None'}"/>
+
+                                <!-- PRD value -->
+                                <ObjectStatus
+                                    text="{= ${cmp>prdVal} || '—'}"
+                                    state="{cmp>prdState}"
+                                    inverted="{= ${cmp>prdState} !== 'None'}"/>
+
+                                <!-- Sync status — chỉ hiện ở row đầu -->
+                                <ObjectStatus
+                                    text="{cmp>_syncText}"
+                                    state="{cmp>_syncState}"
+                                    inverted="{= ${cmp>_syncState} !== 'None'}"
+                                    visible="{cmp>_showKey}"/>
+
                             </cells>
                         </ColumnListItem>
                     </items>
+
                 </Table>
 
             </VBox>
         </content>
 
         <buttons>
-            <Button text="Close" press=".onEnvCompareClose"/>
+            <Button text="Đóng" press=".onEnvCompareClose"/>
         </buttons>
 
     </Dialog>
