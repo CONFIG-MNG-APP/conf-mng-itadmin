@@ -3,7 +3,11 @@
   "sap.app": {
     "id": "zgsp26.conf.mng.itadmin",
     "type": "application",
-    "i18n": "i18n/i18n.properties",
+    "i18n": {
+      "bundleUrl": "i18n/i18n.properties",
+      "supportedLocales": [""],
+      "fallbackLocale": ""
+    },
     "applicationVersion": { "version": "0.0.1" },
     "title": "{{appTitle}}",
     "description": "{{appDescription}}",
@@ -52,7 +56,11 @@
     "models": {
       "i18n": {
         "type": "sap.ui.model.resource.ResourceModel",
-        "settings": { "bundleName": "zgsp26.conf.mng.itadmin.i18n.i18n" }
+        "settings": {
+          "bundleName": "zgsp26.conf.mng.itadmin.i18n.i18n",
+          "supportedLocales": [""],
+          "fallbackLocale": ""
+        }
       },
       "": {
         "dataSource": "mainService",
