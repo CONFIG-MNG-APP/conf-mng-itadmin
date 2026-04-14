@@ -24,8 +24,10 @@
                     <HBox justifyContent="SpaceBetween" alignItems="Center"
                           class="itadmin-master-hdr">
                         <VBox justifyContent="Center">
-                            <Title text="Config Requests" level="H4"
+                            <Title text="IT Admin Console" level="H4"
                                    class="itadmin-master-title"/>
+                            <Text text="Promote, rollback and audit configuration changes across environments"
+                                  class="itadmin-master-subtitle sapUiTinyMarginTop"/>
                             <HBox alignItems="Center" class="itadmin-kpi-row">
                                 <ObjectStatus text="{kpi>/atDev} DEV"
                                               state="Warning"

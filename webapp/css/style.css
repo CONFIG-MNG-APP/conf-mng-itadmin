@@ -67,6 +67,13 @@ body > div, #container, #container-uiarea { height: 100% !important; }
 }
 
 /* KPI row below title */
+/* App subtitle under the main title */
+.itadmin-master-subtitle.sapMText {
+    font-size: 0.75rem !important;
+    color: #89919A !important;
+    line-height: 1.4 !important;
+}
+
 .itadmin-kpi-row.sapMHBox {
     margin-top: 0.15rem !important;
     flex-wrap: nowrap !important;
