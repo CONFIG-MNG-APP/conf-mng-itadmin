@@ -67,21 +67,21 @@
                                     <core:Icon src="sap-icon://decline"
                                                color="#BB0000" size="0.9rem"
                                                class="sapUiTinyMarginEnd"/>
-                                    <Title text="Giá trị cũ" level="H5"/>
+                                    <Title text="Old Value" level="H5"/>
                                 </Toolbar>
                             </headerToolbar>
                             <Table items="{diff>/oldFields}"
                                    showSeparators="Inner"
-                                   noDataText="(không có dữ liệu)">
+                                   noDataText="(no data)">
                                 <columns>
-                                    <Column width="10rem"><Text text="Trường"/></Column>
-                                    <Column><Text text="Giá trị"/></Column>
+                                    <Column width="10rem"><Text text="Field"/></Column>
+                                    <Column><Text text="Value"/></Column>
                                 </columns>
                                 <items>
                                     <ColumnListItem highlight="{= ${diff>changed} ? 'Error' : 'None'}">
                                         <cells>
                                             <Text text="{diff>field}" class="sapUiSmallText sapThemeNeutralText"/>
-                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(trống)'}"
+                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(empty)'}"
                                                   class="{= ${diff>changed} ? 'sapThemeNegativeText' : ''}"/>
                                         </cells>
                                     </ColumnListItem>
@@ -96,21 +96,21 @@
                                     <core:Icon src="sap-icon://accept"
                                                color="#107E3E" size="0.9rem"
                                                class="sapUiTinyMarginEnd"/>
-                                    <Title text="Giá trị mới" level="H5"/>
+                                    <Title text="New Value" level="H5"/>
                                 </Toolbar>
                             </headerToolbar>
                             <Table items="{diff>/newFields}"
                                    showSeparators="Inner"
-                                   noDataText="(không có dữ liệu)">
+                                   noDataText="(no data)">
                                 <columns>
-                                    <Column width="10rem"><Text text="Trường"/></Column>
-                                    <Column><Text text="Giá trị"/></Column>
+                                    <Column width="10rem"><Text text="Field"/></Column>
+                                    <Column><Text text="Value"/></Column>
                                 </columns>
                                 <items>
                                     <ColumnListItem highlight="{= ${diff>changed} ? 'Success' : 'None'}">
                                         <cells>
                                             <Text text="{diff>field}" class="sapUiSmallText sapThemeNeutralText"/>
-                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(trống)'}"
+                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(empty)'}"
                                                   class="{= ${diff>changed} ? 'sapThemePositiveText' : ''}"/>
                                         </cells>
                                     </ColumnListItem>
@@ -125,7 +125,7 @@
         </content>
 
         <buttons>
-            <Button text="Đóng" press=".onAuditDiffClose"/>
+            <Button text="Close" press=".onAuditDiffClose"/>
         </buttons>
 
     </Dialog>

@@ -47,19 +47,21 @@
                         <HBox alignItems="Center">
                             <Button icon="sap-icon://compare"
                                     type="Transparent"
-                                    tooltip="So sánh môi trường"
+                                    tooltip="Compare Environments"
                                     press=".onEnvCompareOpen"/>
-                            <Button id="notifBell"
-                                    icon="sap-icon://bell"
-                                    type="Transparent"
-                                    tooltip="Thông báo"
-                                    press=".onNotifBellPress">
-                                <customData>
-                                    <BadgeCustomData key="badge"
-                                        value="{notif>/count}"
-                                        visible="{= ${notif>/count} > 0}"/>
-                                </customData>
-                            </Button>
+                            <HBox id="notifBellWrapper"
+                                  alignItems="Center"
+                                  class="itNotifBellWrapper">
+                                <Button id="notifBell"
+                                        icon="sap-icon://bell"
+                                        type="Transparent"
+                                        tooltip="Notifications"
+                                        press=".onNotifBellPress"/>
+                                <Text id="notifBadgeText"
+                                      text="{= ${notif>/unreadCount} > 99 ? '99+' : String(${notif>/unreadCount})}"
+                                      visible="{= ${notif>/unreadCount} > 0}"
+                                      class="itNotifBadge"/>
+                            </HBox>
                         </HBox>
                     </HBox>
 
@@ -90,7 +92,7 @@
                     <!-- ③ Filter Strip — Requests ───────────────── -->
                     <VBox class="itadmin-filter-strip">
                         <SearchField id="searchField"
-                                     placeholder="Tìm theo tên, người tạo, key..."
+                                     placeholder="Search by name, creator, key..."
                                      search=".onSearch"
                                      showSearchButton="false"/>
                         <HBox alignItems="Center" wrap="Wrap"
@@ -100,7 +102,7 @@
                                              selectionChange=".onFilter"
                                              class="itadmin-env-seg">
                                 <items>
-                                    <SegmentedButtonItem key=""    text="Tất cả"/>
+                                    <SegmentedButtonItem key=""    text="All"/>
                                     <SegmentedButtonItem key="DEV" text="DEV"/>
                                     <SegmentedButtonItem key="QAS" text="QAS"/>
                                     <SegmentedButtonItem key="PRD" text="PRD"/>
@@ -110,10 +112,10 @@
                             <DateRangeSelection id="dateFilter"
                                                 width="11.5rem"
                                                 change=".onFilter"
-                                                placeholder="Từ — đến"/>
+                                                placeholder="From — To"/>
                             <Button icon="sap-icon://clear-filter"
                                     type="Transparent"
-                                    tooltip="Xóa bộ lọc"
+                                    tooltip="Clear Filters"
                                     press=".onClearFilter"
                                     class="sapUiTinyMarginBegin"/>
                             <Button icon="sap-icon://refresh"
@@ -125,7 +127,7 @@
 
                     <!-- ④ Request List ──────────────────────────── -->
                     <List id="requestList"
-                          noDataText="Không có request nào."
+                          noDataText="No requests found."
                           items="{vm>/requests}"
                           selectionChange=".onRequestListSelect"
                           mode="SingleSelectMaster"
@@ -138,7 +140,7 @@
                                     <!-- Row 1: Title + ENV badge -->
                                     <HBox justifyContent="SpaceBetween"
                                           alignItems="Start">
-                                        <Text text="{= ${vm>ReqTitle} || '(Không có tên)'}"
+                                        <Text text="{= ${vm>ReqTitle} || '(No name)'}"
                                               class="itadmin-item-title"
                                               wrapping="true" width="78%"/>
                                         <ObjectStatus
@@ -215,7 +217,7 @@
                         <!-- Audit filter strip -->
                         <VBox class="itadmin-filter-strip">
                             <SearchField id="auditSearch"
-                                         placeholder="Tìm audit log..."
+                                         placeholder="Search audit log..."
                                          search=".onAuditSearch"
                                          showSearchButton="false"/>
                             <HBox alignItems="Center" wrap="Wrap"
@@ -259,7 +261,7 @@
 
                         <!-- Audit list -->
                         <List id="auditList"
-                              noDataText="Không có dữ liệu audit."
+                              noDataText="No audit data."
                               items="{vm>/auditDisplay}"
                               selectionChange=".onAuditListSelect"
                               mode="SingleSelectMaster"
@@ -321,7 +323,7 @@
                                 press=".onDetailBack"
                                 class="itadmin-back-btn"/>
                         <VBox class="itadmin-detail-hdr-content">
-                            <Title text="{= ${detail>/confName} || 'Chi tiết Request'}"
+                            <Title text="{= ${detail>/confName} || 'Request Details'}"
                                    level="H4" class="itadmin-detail-title"
                                    wrapping="false"/>
                             <HBox alignItems="Center" class="itadmin-detail-subtitle">
@@ -362,7 +364,7 @@
                                                  class="itadmin-preview-bar">
                                             <ToolbarSpacer/>
                                             <ToggleButton
-                                                text="Chỉ hiện thay đổi"
+                                                text="Show Changes Only"
                                                 icon="sap-icon://filter"
                                                 pressed="{detail>/showChangedOnly}"
                                                 press=".onToggleChangedOnly"/>
@@ -386,7 +388,7 @@
                                                     <core:Icon src="sap-icon://warning2"
                                                                color="#E9730C" size="0.9rem"
                                                                class="sapUiTinyMarginEnd"/>
-                                                    <Title text="{= 'Xác nhận Rollback — ' + ${detail>/rollbackTargetEnv}}"
+                                                    <Title text="{= 'Confirm Rollback — ' + ${detail>/rollbackTargetEnv}}"
                                                            level="H5"/>
                                                     <ToolbarSpacer/>
                                                     <Button icon="sap-icon://decline"
@@ -396,15 +398,15 @@
                                             </headerToolbar>
                                             <VBox class="sapUiSmallMargin">
                                                 <MessageStrip
-                                                    text="{= 'Dữ liệu tại ' + ${detail>/rollbackTargetEnv} + ' sẽ revert về giá trị cũ. Hành động không thể hoàn tác!'}"
+                                                    text="{= 'Data at ' + ${detail>/rollbackTargetEnv} + ' will revert to old values. This action cannot be undone!'}"
                                                     type="Warning" showIcon="true"
                                                     class="sapUiTinyMarginBottom"/>
                                                 <HBox class="sapUiSmallMarginTop">
-                                                    <Button text="Xác nhận Rollback"
+                                                    <Button text="Confirm Rollback"
                                                             type="Reject"
                                                             icon="sap-icon://undo"
                                                             press=".onRollbackConfirm"/>
-                                                    <Button text="Hủy"
+                                                    <Button text="Cancel"
                                                             press=".onRollbackCancel"
                                                             class="sapUiSmallMarginBegin"/>
                                                 </HBox>
@@ -435,7 +437,7 @@
                                                     inverted="true"/>
                                             </VBox>
                                             <VBox class="itadmin-info-field">
-                                                <Label text="ENV hiện tại" design="Bold"/>
+                                                <Label text="Current ENV" design="Bold"/>
                                                 <ObjectStatus text="{detail>/curEnv}"
                                                     state="{= ${detail>/curEnv} === 'PRD' ? 'Success' :
                                                                ${detail>/curEnv} === 'QAS' ? 'Warning' : 'Information'}"
@@ -457,7 +459,7 @@
                                             </VBox>
                                             <VBox width="100%" class="itadmin-info-field">
                                                 <Label text="Reason" design="Bold"/>
-                                                <Text text="{= ${detail>/reason} &amp;&amp; ${detail>/reason} !== '-' ? ${detail>/reason} : '(không có lý do)'}"
+                                                <Text text="{= ${detail>/reason} &amp;&amp; ${detail>/reason} !== '-' ? ${detail>/reason} : '(no reason)'}"
                                                       wrapping="true"/>
                                             </VBox>
                                         </HBox>
@@ -489,9 +491,9 @@
                         <ToolbarSpacer/>
                         <Button icon="sap-icon://compare"
                                 type="Transparent"
-                                tooltip="So sánh môi trường"
+                                tooltip="Compare Environments"
                                 press=".onEnvCompareOpen"/>
-                        <Button text="Đóng"
+                        <Button text="Close"
                                 type="Transparent"
                                 icon="sap-icon://decline"
                                 press=".onDetailBack"/>

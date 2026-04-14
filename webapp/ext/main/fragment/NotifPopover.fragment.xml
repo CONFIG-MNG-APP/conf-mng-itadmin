@@ -3,59 +3,76 @@
     xmlns:core="sap.ui.core">
 
     <Popover id="notifPopover"
-             title="Thông báo mới"
              placement="Bottom"
              contentWidth="28rem"
-             showHeader="true">
+             contentHeight="26rem"
+             showHeader="false"
+             verticalScrolling="true"
+             horizontalScrolling="false"
+             afterClose=".onNotifPopoverClose">
 
-        <content>
-            <List id="notifList"
-                  items="{notif>/items}"
-                  noDataText="Không có thông báo mới."
-                  showSeparators="Inner">
-                <items>
-                    <CustomListItem>
-                        <HBox alignItems="Center" justifyContent="SpaceBetween"
-                              class="sapUiSmallMarginBegin sapUiSmallMarginEnd sapUiTinyMarginTopBottom">
-
-                            <!-- Nội dung thông báo -->
-                            <VBox class="sapUiSmallMarginEnd" width="18rem">
-                                <Text text="{notif>title}"
-                                      class="sapUiBoldText" wrapping="true"/>
-                                <Text text="{notif>description}"
-                                      class="sapUiTinyMarginTop"/>
-                                <HBox alignItems="Center" class="sapUiTinyMarginTop">
-                                    <core:Icon src="sap-icon://employee"
-                                               color="#89919A" size="0.8rem"
-                                               class="sapUiTinyMarginEnd"/>
-                                    <Text text="{notif>by}" class="sapUiTinyMarginEnd"/>
-                                    <Text text="·" class="sapUiTinyMarginEnd"/>
-                                    <Text text="{notif>at}"/>
-                                </HBox>
-                            </VBox>
-
-                            <!-- Button navigate thẳng vào module -->
-                            <Button icon="sap-icon://arrow-right"
-                                    tooltip="Chuyển đến module"
-                                    type="Emphasized"
-                                    visible="{= !!${notif>moduleId}}"
-                                    press=".onNotifGoToModule"/>
-
-                        </HBox>
-                    </CustomListItem>
-                </items>
-            </List>
-        </content>
-
-        <footer>
-            <Toolbar>
+        <customHeader>
+            <Toolbar style="Clear" height="2.75rem">
+                <Title text="Notifications" level="H5"/>
                 <ToolbarSpacer/>
-                <Button text="Đánh dấu tất cả đã đọc"
-                        icon="sap-icon://accept"
+                <Button text="Mark All Read"
+                        type="Transparent"
                         press=".onNotifMarkAllRead"
-                        visible="{= ${notif>/count} > 0}"/>
+                        visible="{= ${notif>/unreadCount} > 0}"/>
+                <Button icon="sap-icon://delete"
+                        type="Transparent"
+                        tooltip="Clear All"
+                        press=".onNotifClearAll"/>
             </Toolbar>
-        </footer>
+        </customHeader>
+
+        <List id="notifList"
+              items="{notif>/notifications}"
+              noDataText="No new notifications"
+              showSeparators="Inner">
+            <CustomListItem type="Active"
+                            press=".onNotifItemPress"
+                            class="{= ${notif>read} ? 'itNotifItem itNotifItem--read' : 'itNotifItem itNotifItem--unread'}">
+                <HBox alignItems="Start"
+                      class="sapUiSmallMarginBegin sapUiSmallMarginEnd sapUiSmallMarginTopBottom">
+
+                    <!-- Unread dot -->
+                    <core:HTML content="{= ${notif>read}
+                        ? '&lt;span class=&quot;itNotifDot itNotifDot--hidden&quot;&gt;&lt;/span&gt;'
+                        : '&lt;span class=&quot;itNotifDot&quot;&gt;&lt;/span&gt;'}"/>
+
+                    <!-- Status icon -->
+                    <core:Icon src="{notif>icon}"
+                               color="{= ${notif>state} === 'Error'   ? '#bb0000' :
+                                          ${notif>state} === 'Success' ? '#107e3e' :
+                                          ${notif>state} === 'Warning' ? '#e9730c' : '#0070f2'}"
+                               size="1.1rem"
+                               class="sapUiSmallMarginEnd sapUiTinyMarginTop"/>
+
+                    <!-- Title + message -->
+                    <VBox class="itNotifText" fitContainer="true">
+                        <Text text="{notif>title}"
+                              maxLines="1"
+                              class="{= ${notif>read} ? 'itNotifTitle--read' : 'itNotifTitle--unread'}"/>
+                        <Text text="{notif>message}"
+                              maxLines="2"
+                              wrapping="true"
+                              class="itNotifMessage"/>
+                    </VBox>
+
+                    <!-- Time + NEW badge -->
+                    <VBox class="itNotifMeta" justifyContent="Start" alignItems="End">
+                        <Text text="{notif>time}"
+                              textAlign="End"
+                              class="itNotifTime"/>
+                        <Text text="NEW"
+                              visible="{= !${notif>read}}"
+                              class="itNotifNewBadge"/>
+                    </VBox>
+
+                </HBox>
+            </CustomListItem>
+        </List>
 
     </Popover>
 

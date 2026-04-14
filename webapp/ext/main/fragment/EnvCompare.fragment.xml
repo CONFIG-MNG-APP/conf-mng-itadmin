@@ -30,7 +30,7 @@
 
                     <VBox justifyContent="End" class="sapUiTinyMarginBottom">
                         <HBox alignItems="Center">
-                            <Label text="Chỉ hiện khác nhau" class="sapUiTinyMarginEnd"/>
+                            <Label text="Show Differences Only" class="sapUiTinyMarginEnd"/>
                             <Switch state="{cmp>/diffsOnly}" change=".onEnvCompareDiffsOnly"/>
                         </HBox>
                     </VBox>
@@ -44,7 +44,7 @@
                                       state="None"
                                       class="sapUiSmallMarginEnd"
                                       visible="{= ${cmp>/totalKeys} > 0}"/>
-                        <ObjectStatus text="{cmp>/diffCount} khác nhau"
+                        <ObjectStatus text="{cmp>/diffCount} differences"
                                       icon="sap-icon://warning2"
                                       state="{= ${cmp>/diffCount} > 0 ? 'Warning' : 'Success'}"
                                       inverted="{= ${cmp>/diffCount} > 0}"
@@ -56,20 +56,20 @@
                 <!-- ── Legend ────────────────────────────────────────────── -->
                 <HBox alignItems="Center" class="sapUiTinyMarginBottom"
                       visible="{= ${cmp>/totalKeys} > 0}">
-                    <ObjectStatus text="Đồng nhất" state="Success" inverted="true"
+                    <ObjectStatus text="Identical" state="Success" inverted="true"
                                   class="sapUiTinyMarginEnd"/>
-                    <ObjectStatus text="Khác nhau" state="Warning" inverted="true"
+                    <ObjectStatus text="Different" state="Warning" inverted="true"
                                   class="sapUiTinyMarginEnd"/>
-                    <ObjectStatus text="Chỉ ở 1 ENV" state="Error" inverted="true"
+                    <ObjectStatus text="Only in 1 ENV" state="Error" inverted="true"
                                   class="sapUiTinyMarginEnd"/>
-                    <Text text="· Giá trị bôi màu là giá trị lệch so với phần còn lại"
+                    <Text text="· Highlighted values differ from the others"
                           class="sapUiSmallText sapThemeNeutralText"/>
                 </HBox>
 
                 <!-- ── Result Table ──────────────────────────────────────── -->
                 <Table id="cmpTable"
                        inset="false"
-                       noDataText="Chọn module rồi bấm Compare."
+                       noDataText="Select a module and click Compare."
                        items="{cmp>/rows}"
                        sticky="ColumnHeaders"
                        growing="true" growingThreshold="200">
@@ -160,7 +160,7 @@
         </content>
 
         <buttons>
-            <Button text="Đóng" press=".onEnvCompareClose"/>
+            <Button text="Close" press=".onEnvCompareClose"/>
         </buttons>
 
     </Dialog>

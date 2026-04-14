@@ -525,7 +525,134 @@ body > div, #container, #container-uiarea { height: 100% !important; }
 
 
 /* ───────────────────────────────────────────────────────────────────
-   17. PREVIEW DIFF table (inside Preview tab)
+   17. NOTIFICATION BELL — badge overlay (catalog-style)
+   ─────────────────────────────────────────────────────────────────── */
+
+.itNotifBellWrapper.sapMHBox {
+    position: relative;
+}
+
+.itNotifBadge.sapMText {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px !important;
+    border-radius: 8px;
+    background: #bb0000;
+    color: #fff !important;
+    font-size: 10px !important;
+    font-weight: bold !important;
+    line-height: 16px !important;
+    text-align: center;
+    pointer-events: none;
+    z-index: 10;
+    box-sizing: border-box;
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   17b. NOTIFICATION POPOVER — list items
+   ─────────────────────────────────────────────────────────────────── */
+
+/* List item base */
+.itNotifItem {
+    padding: 0 !important;
+}
+
+.itNotifItem:hover {
+    background: #f0f4ff !important;
+}
+
+/* Unread: blue tint + left accent border */
+.itNotifItem--unread {
+    background: #eef4ff !important;
+    border-left: 4px solid #0070f2 !important;
+}
+
+.itNotifItem--unread:hover {
+    background: #ddeaff !important;
+}
+
+/* Read: normal, slightly dimmed */
+.itNotifItem--read {
+    background: #ffffff !important;
+    border-left: 4px solid transparent !important;
+    opacity: 0.85;
+}
+
+/* Unread blue dot */
+.itNotifDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #0070f2;
+    flex-shrink: 0;
+    margin-right: 8px;
+    margin-top: 4px;
+}
+
+.itNotifDot--hidden {
+    visibility: hidden;
+}
+
+/* Text area */
+.itNotifText {
+    flex: 1;
+    min-width: 0;
+}
+
+.itNotifTitle--unread {
+    font-size: 0.875rem !important;
+    font-weight: 700 !important;
+    color: #0a0a0a !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.itNotifTitle--read {
+    font-size: 0.875rem !important;
+    font-weight: 400 !important;
+    color: #6a6d70 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.itNotifMessage {
+    font-size: 0.8rem !important;
+    color: #6a6d70 !important;
+    margin-top: 2px;
+    line-height: 1.3;
+}
+
+/* Meta column (time + NEW badge) */
+.itNotifMeta {
+    min-width: 4rem;
+    padding-left: 0.5rem;
+}
+
+.itNotifTime {
+    font-size: 0.7rem !important;
+    color: #89919a !important;
+    white-space: nowrap;
+}
+
+.itNotifNewBadge {
+    font-size: 0.6rem !important;
+    font-weight: 700 !important;
+    color: #fff !important;
+    background: #0070f2;
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-top: 3px;
+    white-space: nowrap;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   18. PREVIEW DIFF table (inside Preview tab)
    ─────────────────────────────────────────────────────────────────── */
 
 .itadmin-diff-inner-table.sapMList {

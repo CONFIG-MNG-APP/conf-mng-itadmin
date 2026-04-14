@@ -3,7 +3,7 @@
     xmlns:core="sap.ui.core">
 
     <Dialog id="versionHistoryDialog"
-            title="{= 'Lịch sử phiên bản — ' + ${vh>/moduleLabel}}"
+            title="{= 'Version History — ' + ${vh>/moduleLabel}}"
             contentWidth="76rem" contentHeight="auto"
             draggable="true" resizable="true"
             verticalScrolling="true">
@@ -14,7 +14,7 @@
                 <!-- ══ Version List Table ══════════════════════════════════════ -->
                 <Table id="versionTable"
                        items="{vh>/versions}"
-                       noDataText="{= ${vh>/loadingVersions} ? 'Đang tải...' : 'Không có phiên bản nào tại PRD.'}"
+                       noDataText="{= ${vh>/loadingVersions} ? 'Loading...' : 'No versions at PRD.'}"
                        growing="true" growingThreshold="20"
                        alternateRowColors="true">
 
@@ -22,21 +22,21 @@
                         <OverflowToolbar style="Clear">
                             <core:Icon src="sap-icon://history" color="#0070F2"
                                        size="1rem" class="sapUiTinyMarginEnd"/>
-                            <Title text="Toàn bộ phiên bản tại PRD" level="H4"/>
+                            <Title text="All versions at PRD" level="H4"/>
                             <ToolbarSpacer/>
                             <ObjectStatus
-                                text="{= ${vh>/versions}.length + ' phiên bản'}"
+                                text="{= ${vh>/versions}.length + ' versions'}"
                                 state="Information" icon="sap-icon://tag"/>
                         </OverflowToolbar>
                     </headerToolbar>
 
                     <columns>
-                        <Column width="7rem"><Text text="Phiên bản"/></Column>
-                        <Column><Text text="Tên request"/></Column>
+                        <Column width="7rem"><Text text="Version"/></Column>
+                        <Column><Text text="Request Name"/></Column>
                         <Column width="11rem"><Text text="Promoted by"/></Column>
-                        <Column width="13rem"><Text text="Ngày promote"/></Column>
-                        <Column width="12rem"><Text text="Trạng thái"/></Column>
-                        <Column width="16rem" hAlign="Center"><Text text="Thao tác"/></Column>
+                        <Column width="13rem"><Text text="Promoted at"/></Column>
+                        <Column width="12rem"><Text text="Status"/></Column>
+                        <Column width="16rem" hAlign="Center"><Text text="Actions"/></Column>
                     </columns>
 
                     <items>
@@ -56,7 +56,7 @@
                                     <Text text="{vh>reqTitle}" wrapping="true"/>
                                     <ObjectStatus
                                         visible="{vh>isCurrent}"
-                                        text="Đang áp dụng"
+                                        text="Active"
                                         state="Success"
                                         icon="sap-icon://accept"
                                         class="sapUiTinyMarginTop"/>
@@ -82,7 +82,7 @@
 
                                 <!-- Actions -->
                                 <HBox alignItems="Center" justifyContent="Center">
-                                    <Button text="Xem dữ liệu"
+                                    <Button text="View Data"
                                             icon="sap-icon://detail-view"
                                             type="{= ${vh>isSelected} ? 'Emphasized' : 'Default'}"
                                             press=".onVersionSelect"/>
@@ -107,30 +107,30 @@
                         <OverflowToolbar>
                             <core:Icon src="sap-icon://detail-view" color="#0070F2"
                                        size="1rem" class="sapUiTinyMarginEnd"/>
-                            <Title text="{= 'Dữ liệu tại ' + (${vh>/selectedVersion/versionLabel} || '') +
+                            <Title text="{= 'Data at ' + (${vh>/selectedVersion/versionLabel} || '') +
                                             ' — ' + (${vh>/selectedVersion/reqTitle} || '')}"
                                    level="H5"/>
                             <ToolbarSpacer/>
-                            <ToggleButton text="Chỉ hiện thay đổi"
+                            <ToggleButton text="Show Changes Only"
                                           icon="sap-icon://filter"
                                           pressed="{vh>/showChangedOnly}"
                                           press=".onVhToggleChangedOnly"/>
                             <Button icon="sap-icon://decline"
-                                    tooltip="Đóng preview"
+                                    tooltip="Close preview"
                                     type="Transparent"
                                     press=".onVhClosePreview"/>
                         </OverflowToolbar>
                     </headerToolbar>
 
                     <Table items="{vh>/previewLines}"
-                           noDataText="{= ${vh>/loadingPreview} ? 'Đang tải dữ liệu...' : 'Không có dữ liệu.'}"
+                           noDataText="{= ${vh>/loadingPreview} ? 'Loading data...' : 'No data.'}"
                            alternateRowColors="true">
                         <columns>
                             <Column width="16rem"><Text text="Config Item"/></Column>
                             <Column width="10rem"><Text text="Field"/></Column>
-                            <Column><Text text="Giá trị trước version này"/></Column>
-                            <Column><Text text="Giá trị tại version này"/></Column>
-                            <Column width="8rem" hAlign="Center"><Text text="Có thay đổi?"/></Column>
+                            <Column><Text text="Value before this version"/></Column>
+                            <Column><Text text="Value at this version"/></Column>
+                            <Column width="8rem" hAlign="Center"><Text text="Changed?"/></Column>
                         </columns>
                         <items>
                             <ColumnListItem highlight="{= ${vh>changed} ? 'Warning' : 'None'}">
@@ -138,17 +138,17 @@
                                     <Text text="{vh>keyInfo}" wrapping="true"/>
                                     <Text text="{vh>field}"/>
                                     <ObjectStatus
-                                        text="{= ${vh>oldVal} !== '' ? ${vh>oldVal} : '(trống)'}"
+                                        text="{= ${vh>oldVal} !== '' ? ${vh>oldVal} : '(empty)'}"
                                         state="{= ${vh>changed} ? 'Error' : 'None'}"/>
                                     <ObjectStatus
-                                        text="{= ${vh>newVal} !== '' ? ${vh>newVal} : '(trống)'}"
+                                        text="{= ${vh>newVal} !== '' ? ${vh>newVal} : '(empty)'}"
                                         state="{= ${vh>changed} ? 'Success' : 'None'}"/>
                                     <HBox alignItems="Center" justifyContent="Center">
                                         <core:Icon
                                             src="{= ${vh>changed} ? 'sap-icon://message-warning' : 'sap-icon://accept'}"
                                             color="{= ${vh>changed} ? '#E9730C' : '#107E3E'}"
                                             size="0.9rem" class="sapUiTinyMarginEnd"/>
-                                        <Text text="{= ${vh>changed} ? 'Có' : 'Không'}"/>
+                                        <Text text="{= ${vh>changed} ? 'Yes' : 'No'}"/>
                                     </HBox>
                                 </cells>
                             </ColumnListItem>
@@ -163,24 +163,24 @@
                         <Toolbar>
                             <core:Icon src="sap-icon://warning2" color="#E9730C"
                                        size="1rem" class="sapUiTinyMarginEnd"/>
-                            <Title text="{= 'Xác nhận Rollback — ' + (${vh>/selectedVersion/versionLabel} || '') + ' tại PRD'}"
+                            <Title text="{= 'Confirm Rollback — ' + (${vh>/selectedVersion/versionLabel} || '') + ' at PRD'}"
                                    level="H5"/>
                             <ToolbarSpacer/>
-                            <Button icon="sap-icon://decline" tooltip="Hủy"
+                            <Button icon="sap-icon://decline" tooltip="Cancel"
                                     type="Transparent" press=".onVhRollbackCancel"/>
                         </Toolbar>
                     </headerToolbar>
                     <VBox class="sapUiSmallMargin">
                         <MessageStrip
                             text="{= 'Rollback ' + (${vh>/selectedVersion/versionLabel} || '') +
-                                      ': toàn bộ dữ liệu sẽ revert về giá trị trước version này (cột &quot;Giá trị trước&quot; trong preview). Hành động không thể hoàn tác!'}"
+                                      ': all data will revert to values before this version (the &quot;Before&quot; column in preview). This action cannot be undone!'}"
                             type="Warning" showIcon="true"
                             class="sapUiTinyMarginBottom"/>
                         <HBox class="sapUiSmallMarginTop">
-                            <Button text="Xác nhận Rollback"
+                            <Button text="Confirm Rollback"
                                     type="Reject" icon="sap-icon://undo"
                                     press=".onVhRollbackConfirm"/>
-                            <Button text="Hủy"
+                            <Button text="Cancel"
                                     press=".onVhRollbackCancel"
                                     class="sapUiSmallMarginBegin"/>
                         </HBox>
@@ -191,7 +191,7 @@
         </content>
 
         <buttons>
-            <Button text="Đóng" press=".onVersionHistoryClose"/>
+            <Button text="Close" press=".onVersionHistoryClose"/>
         </buttons>
 
     </Dialog>

@@ -5,8 +5,9 @@ sap.ui.define(
     "sap/m/MessageBox",
     "sap/ui/core/Fragment",
     "sap/ui/model/json/JSONModel",
+    "zgsp26/conf/mng/itadmin/ext/main/NotificationService",
   ],
-  function (Controller, MessageToast, MessageBox, Fragment, JSONModel) {
+  function (Controller, MessageToast, MessageBox, Fragment, JSONModel, NotificationService) {
     "use strict";
 
     // ─── OData service base URL ───────────────────────────────────────────────
@@ -14,6 +15,15 @@ sap.ui.define(
     const _AUDIT_URL   = "/sap/opu/odata4/sap/zui_audit_log/srvd/sap/zsd_audit_log/0001/AuditLog";
     const _FETCH_HDR   = { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" };
     const _ENV_ORDER   = { DEV: 1, QAS: 2, PRD: 3 };
+
+    function _getSapClient() {
+      try {
+        var sUrl = window.location.href;
+        var oMatch = sUrl.match(/[?&]sap-client=(\d+)/);
+        if (oMatch) return oMatch[1];
+      } catch (e) {}
+      return "324"; // default client
+    }
 
     // ─── Service config per module ────────────────────────────────────────────
     // url    → main config table (bảng chính) — used for the list
@@ -101,7 +111,7 @@ sap.ui.define(
     function _formatDate(sIso) {
       if (!sIso) return "-";
       try {
-        return new Date(sIso).toLocaleDateString("vi-VN", {
+        return new Date(sIso).toLocaleDateString("en-GB", {
           day: "2-digit", month: "2-digit", year: "numeric",
           hour: "2-digit", minute: "2-digit",
         });
@@ -115,8 +125,8 @@ sap.ui.define(
       onInit: function () {
         this._sSelectedModule = "MM";
         this._oVersionData    = {};
-        this._oReqModuleMap   = {};
         this._aCachedAll      = null;
+        this._oReqModuleMap   = {};
         // FCL layout model — start with both columns visible
         this.getView().setModel(
           new JSONModel({ layout: "TwoColumnsMidExpanded", showDetail: false }),
@@ -134,8 +144,9 @@ sap.ui.define(
           new JSONModel({ requests: [], auditEntries: [], auditDisplay: [] }),
           "vm"
         );
+        // Notification model — managed by NotificationService (APPROVED-only polling)
         this.getView().setModel(
-          new JSONModel({ count: 0, items: [] }),
+          NotificationService.init(_getSapClient()),
           "notif"
         );
         this.getView().setModel(
@@ -158,62 +169,12 @@ sap.ui.define(
           }),
           "detail"
         );
-        // Load danh sách đã đọc từ localStorage
-        try {
-          this._oSeenNotifs = new Set(JSON.parse(localStorage.getItem("itadmin_seen_notifs") || "[]"));
-        } catch (e) { this._oSeenNotifs = new Set(); }
-
         this._loadRequests();
-        this._loadModuleVersions();
-        this._startNotifPolling();
         this._loadAuditTrail();
       },
 
       onExit: function () {
-        if (this._iNotifTimer) { clearInterval(this._iNotifTimer); }
-      },
-
-      // ─── Notification polling ─────────────────────────────────────────────────
-
-      _startNotifPolling: function () {
-        this._pollNotifications();
-        this._iNotifTimer = setInterval(this._pollNotifications.bind(this), 60000); // 60s
-      },
-
-      _pollNotifications: async function () {
-        try {
-          // Fetch tất cả req có Status='ACTIVE' (manager đã approve)
-          // Chỉ bắt req vừa được manager duyệt ở DEV (chưa promote).
-          // Khi promote lên QAS/PRD cũng tạo record ACTIVE nhưng EnvId != DEV → không bắt.
-          const sUrl = _BASE_URL + "ZC_CONF_REQ_H" +
-            "?$filter=" + encodeURIComponent("Status eq 'ACTIVE' and EnvId eq 'DEV'") +
-            "&$select=ReqId,EnvId,ReqTitle,CreatedBy,CreatedAt&$top=200&$orderby=CreatedAt desc";
-          const oResp = await fetch(sUrl, { headers: _FETCH_HDR });
-          if (!oResp.ok) return;
-          const aAll = (await oResp.json()).value || [];
-
-          // Chỉ lấy những item chưa đọc
-          const aNew = aAll.filter((h) => !this._oSeenNotifs.has(h.ReqId + "|" + h.EnvId));
-
-          const oMap = this._oReqModuleMap;
-          this.getView().getModel("notif").setData({
-            count: aNew.length,
-            items: aNew.map(function (h) {
-              const sMod = oMap[h.ReqId] || "";
-              return {
-                key:         h.ReqId + "|" + h.EnvId,
-                reqId:       h.ReqId,
-                envId:       h.EnvId,
-                moduleId:    sMod,
-                moduleLabel: sMod && _SERVICES[sMod] ? _SERVICES[sMod].label : "",
-                title:       h.ReqTitle || h.ReqId,
-                description: "Đã được duyệt — ENV: " + (h.EnvId || "-"),
-                by:          h.CreatedBy || "-",
-                at:          _formatDate(h.CreatedAt),
-              };
-            }),
-          });
-        } catch (e) { console.warn("Notif poll failed:", e); }
+        NotificationService.destroy();
       },
 
       // ─── Notification handlers ────────────────────────────────────────────────
@@ -235,99 +196,40 @@ sap.ui.define(
         }
       },
 
-      onNotifItemPress: function (oEvent) {
-        const oItem = oEvent.getSource().getBindingContext("notif").getObject();
-        this._markNotifRead(oItem.key);
-        if (this._oNotifPopover) { this._oNotifPopover.close(); }
+      onNotifPopoverClose: function () {
+        // nothing needed — popover closes itself
       },
 
-      onNotifItemClose: function (oEvent) {
-        const oItem = oEvent.getSource().getBindingContext("notif").getObject();
-        this._markNotifRead(oItem.key);
+      // Click notification item → mark read + navigate to module tab + close popover
+      onNotifItemPress: function (oEvent) {
+        const oCtx  = oEvent.getSource().getBindingContext("notif");
+        if (!oCtx) return;
+        const oItem = oCtx.getObject();
+
+        // Mark as read
+        NotificationService.markRead(oItem.id);
+
+        // Navigate to the request's module tab
+        const sMod = oItem.ModuleId;
+        if (sMod && _SERVICES[sMod]) {
+          this._sSelectedModule = sMod;
+          this.byId("moduleTabBar").setSelectedKey(sMod);
+          const oKpi = this.getView().getModel("kpi");
+          oKpi.setProperty("/selectedModule", sMod);
+          oKpi.setProperty("/selectedLabel",  _SERVICES[sMod].label);
+          this.getView().getModel("detail").setProperty("/isAuditDefault", true);
+          this._loadRequests();
+        }
+
+        if (this._oNotifPopover) { this._oNotifPopover.close(); }
       },
 
       onNotifMarkAllRead: function () {
-        const aItems = this.getView().getModel("notif").getProperty("/items") || [];
-        aItems.forEach((i) => this._oSeenNotifs.add(i.key));
-        this._saveSeenNotifs();
-        this.getView().getModel("notif").setData({ count: 0, items: [] });
-        if (this._oNotifPopover) { this._oNotifPopover.close(); }
+        NotificationService.markAllRead();
       },
 
-      onNotifGoToModule: function (oEvent) {
-        const oItem = oEvent.getSource().getParent().getBindingContext("notif").getObject();
-        const sMod  = oItem.moduleId;
-        if (!sMod || !_SERVICES[sMod]) {
-          MessageToast.show("Không xác định được module của request này.");
-          return;
-        }
-        // Chuyển sang tab module tương ứng
-        this._sSelectedModule = sMod;
-        this.byId("moduleTabBar").setSelectedKey(sMod);
-        const oKpi = this.getView().getModel("kpi");
-        oKpi.setProperty("/isAuditMode",   false);
-        oKpi.setProperty("/selectedModule", sMod);
-        oKpi.setProperty("/selectedLabel",  _SERVICES[sMod].label);
-        const vNo = this._oVersionData[sMod];
-        oKpi.setProperty("/selectedVer", vNo != null ? "v." + vNo : "-");
-        this._loadRequests();
-        this._markNotifRead(oItem.key);
-        if (this._oNotifPopover) { this._oNotifPopover.close(); }
-      },
-
-      _markNotifRead: function (sKey) {
-        this._oSeenNotifs.add(sKey);
-        this._saveSeenNotifs();
-        const oNotif = this.getView().getModel("notif");
-        const aItems = (oNotif.getProperty("/items") || []).filter((i) => i.key !== sKey);
-        oNotif.setProperty("/items", aItems);
-        oNotif.setProperty("/count", aItems.length);
-      },
-
-      _saveSeenNotifs: function () {
-        try {
-          // Giữ tối đa 500 entries gần nhất để tránh localStorage overflow
-          const aEntries = [...this._oSeenNotifs];
-          if (aEntries.length > 500) {
-            const aPruned = aEntries.slice(aEntries.length - 500);
-            this._oSeenNotifs = new Set(aPruned);
-          }
-          localStorage.setItem("itadmin_seen_notifs", JSON.stringify([...this._oSeenNotifs]));
-        } catch (e) { /* ignore */ }
-      },
-
-      // ─── Module versions ──────────────────────────────────────────────────────
-      //   Version của mỗi module = số lần config của module đó bị thay đổi
-      //   tại mỗi env (promote hoặc rollback đều tính là +1 version).
-      //
-      //   Cách tính:
-      //     1. Fetch reqUrl của từng module → map ReqId → ModuleId
-      //     2. Fetch toàn bộ ZC_CONF_REQ_H (select ReqId, EnvId)
-      //     3. Đếm số records per (ModuleId, EnvId) → đó là version
-
-      _loadModuleVersions: async function () {
-        // Chỉ build ReqId → ModuleId map cho notification polling.
-        // Version strip được tính từ max VersionNo trong _loadRequests.
-        try {
-          const oReqModuleMap = {};
-          this._oReqModuleMap = oReqModuleMap;
-          await Promise.all(Object.keys(_SERVICES).map(async function (sKey) {
-            try {
-              const oResp = await fetch(
-                _SERVICES[sKey].reqUrl + "?$select=ReqId&$top=5000",
-                { headers: _FETCH_HDR }
-              );
-              if (!oResp.ok) return;
-              ((await oResp.json()).value || []).forEach(function (item) {
-                if (item.ReqId && !oReqModuleMap[item.ReqId]) {
-                  oReqModuleMap[item.ReqId] = sKey;
-                }
-              });
-            } catch (e) { console.warn("Version map " + sKey, e); }
-          }));
-        } catch (e) {
-          console.warn("_loadModuleVersions failed:", e);
-        }
+      onNotifClearAll: function () {
+        NotificationService.clearAll();
       },
 
       // ─── Load pending requests (APPROVED + ACTIVE) ───────────────────────────
@@ -412,7 +314,7 @@ sap.ui.define(
               const f = o.allChanges[0];
               o.changeSummary = f.field + ": " + (f.old || "∅") + " → " + (f.new || "∅");
               if (o.allChanges.length > 1) {
-                o.changeSummary += "  (+" + (o.allChanges.length - 1) + " nữa)";
+                o.changeSummary += "  (+" + (o.allChanges.length - 1) + " more)";
               }
             }
           });
@@ -454,7 +356,7 @@ sap.ui.define(
           this._applyRequestFilters(aAll);
         } catch (e) {
           console.error("_fetchAllRequests failed:", e);
-          MessageBox.error("Không thể tải dữ liệu: " + (e.message || e));
+          MessageBox.error("Failed to load data: " + (e.message || e));
         } finally {
           oView.setBusy(false);
         }
@@ -629,7 +531,7 @@ sap.ui.define(
           this._applyAuditFilters();
         } catch (e) {
           console.error(e);
-          MessageBox.error("Không thể tải Audit Trail: " + (e.message || e));
+          MessageBox.error("Failed to load Audit Trail: " + (e.message || e));
         } finally {
           oView.setBusy(false);
         }
@@ -760,7 +662,7 @@ sap.ui.define(
         this._oCurrentItem = oItem;
         const sNullUuid = "00000000-0000-0000-0000-000000000000";
         if (!oItem.ReqId || oItem.ReqId === sNullUuid) {
-          MessageBox.warning("Không tìm thấy Request ID cho record này.");
+          MessageBox.warning("Request ID not found for this record.");
           return;
         }
         this._openDetailPanel(oItem, !!oItem._nextEnv);
@@ -793,7 +695,7 @@ sap.ui.define(
         this._oCurrentItem = oItem;
         const sNullUuid = "00000000-0000-0000-0000-000000000000";
         if (!oItem.ReqId || oItem.ReqId === sNullUuid) {
-          MessageBox.warning("Không tìm thấy Request ID cho record này.\nRecord có thể được tạo thủ công ngoài luồng request.");
+          MessageBox.warning("Request ID not found for this record.\nThis record may have been created manually outside the request flow.");
           return;
         }
         this._openDetailPanel(oItem, !!oItem._nextEnv);
@@ -882,7 +784,7 @@ sap.ui.define(
           const oContainer = this.byId("previewTableContainer");
           if (oContainer) {
             oContainer.destroyItems();
-            oContainer.addItem(new sap.m.Text({ text: "Lỗi tải dữ liệu — vui lòng đóng và thử lại." }));
+            oContainer.addItem(new sap.m.Text({ text: "Error loading data — please close and try again." }));
           }
         });
       },
@@ -1240,7 +1142,7 @@ sap.ui.define(
         const oSvc = this._oCurrentSvc;
         if (!oSvc || !aRows || !aRows.length) {
           const sap_m = sap.m || sap.ui.require("sap/m/Text");
-          oContainer.addItem(new sap.m.Text({ text: "Không có dữ liệu." }));
+          oContainer.addItem(new sap.m.Text({ text: "No data." }));
           return;
         }
 
@@ -1296,12 +1198,12 @@ sap.ui.define(
           aKeyDiffs.forEach(function (oKF) {
             if (oRow.rowType === "MODIFIED" && oKF.changed) {
               const oBox = new sap.m.HBox({ alignItems: "Center" });
-              oBox.addItem(new sap.m.ObjectStatus({ text: oKF.oldVal || "(trống)", state: "Error" }));
+              oBox.addItem(new sap.m.ObjectStatus({ text: oKF.oldVal || "(empty)", state: "Error" }));
               oBox.addItem(new sap.ui.core.Icon({
                 src: "sap-icon://navigation-right-arrow",
                 color: "#E9730C", size: "0.75rem", style: "margin: 0 0.25rem",
               }));
-              oBox.addItem(new sap.m.ObjectStatus({ text: oKF.newVal || "(trống)", state: "Success" }));
+              oBox.addItem(new sap.m.ObjectStatus({ text: oKF.newVal || "(empty)", state: "Success" }));
               oCLI.addCell(oBox);
             } else {
               oCLI.addCell(new sap.m.Text({ text: oKF.newVal || "-" }));
@@ -1313,19 +1215,19 @@ sap.ui.define(
           oRow.fields.forEach(function (oField) {
             if (oRow.rowType === "ADDED") {
               oCLI.addCell(new sap.m.ObjectStatus({
-                text: oField.newVal || "(trống)",
+                text: oField.newVal || "(empty)",
                 state: "Success",
               }));
             } else if (oRow.rowType === "DELETED") {
               oCLI.addCell(new sap.m.ObjectStatus({
-                text: oField.oldVal || "(trống)",
+                text: oField.oldVal || "(empty)",
                 state: "Error",
               }));
             } else if (oRow.rowType === "MODIFIED" && oField.changed) {
               // Field thực sự thay đổi → hiện old → new
               const oBox = new sap.m.HBox({ alignItems: "Center" });
               oBox.addItem(new sap.m.ObjectStatus({
-                text: oField.oldVal || "(trống)",
+                text: oField.oldVal || "(empty)",
                 state: "Error",
               }));
               oBox.addItem(new sap.ui.core.Icon({
@@ -1334,13 +1236,13 @@ sap.ui.define(
                 style: "margin: 0 0.25rem",
               }));
               oBox.addItem(new sap.m.ObjectStatus({
-                text: oField.newVal || "(trống)",
+                text: oField.newVal || "(empty)",
                 state: "Success",
               }));
               oCLI.addCell(oBox);
             } else {
               oCLI.addCell(new sap.m.Text({
-                text: oField.newVal || "(trống)",
+                text: oField.newVal || "(empty)",
               }));
             }
           });
@@ -1349,9 +1251,8 @@ sap.ui.define(
         });
 
         const oTable = new sap.m.Table({
-          id: this.getView().getId() + "--previewTable",
           inset: false,
-          noDataText: "Không có thay đổi nào.",
+          noDataText: "No changes.",
           columns: aColumns,
           items: aItems,
         });
@@ -1373,10 +1274,10 @@ sap.ui.define(
 
         if (sBlockingEnv) {
           MessageBox.warning(
-            "Không thể rollback " + oItem.EnvId + " lúc này!\n\n" +
-            "ENV " + sBlockingEnv + " vẫn đang ACTIVE với cùng request.\n" +
-            "Phải rollback " + sBlockingEnv + " trước.\n\n" +
-            "Thứ tự bắt buộc: PRD → QAS → DEV",
+            "Cannot rollback " + oItem.EnvId + " right now!\n\n" +
+            "ENV " + sBlockingEnv + " is still ACTIVE for the same request.\n" +
+            "You must rollback " + sBlockingEnv + " first.\n\n" +
+            "Required order: PRD → QAS → DEV",
             { title: "Rollback Order Violation", actions: [MessageBox.Action.CLOSE] }
           );
           return;
@@ -1400,10 +1301,10 @@ sap.ui.define(
 
         if (sBlockingEnv) {
           MessageBox.warning(
-            "Không thể rollback " + sEnv + " lúc này!\n\n" +
-            "ENV " + sBlockingEnv + " vẫn đang ACTIVE với cùng request.\n" +
-            "Phải rollback " + sBlockingEnv + " trước.\n\n" +
-            "Thứ tự bắt buộc: PRD → QAS → DEV",
+            "Cannot rollback " + sEnv + " right now!\n\n" +
+            "ENV " + sBlockingEnv + " is still ACTIVE for the same request.\n" +
+            "You must rollback " + sBlockingEnv + " first.\n\n" +
+            "Required order: PRD → QAS → DEV",
             { title: "Rollback Order Violation", actions: [MessageBox.Action.CLOSE] }
           );
           return;
@@ -1441,10 +1342,10 @@ sap.ui.define(
 
           this._aCachedAll = null;
           this._loadRequests();
-          MessageBox.success("Đã rollback thành công — ENV: " + sEnvId + ".");
+          MessageBox.success("Rollback successful — ENV: " + sEnvId + ".");
         } catch (e) {
           console.error(e);
-          MessageBox.error("Rollback thất bại: " + (e.message || e));
+          MessageBox.error("Rollback failed: " + (e.message || e));
         } finally {
           oView.setBusy(false);
         }
@@ -1470,19 +1371,19 @@ sap.ui.define(
 
         if (sBlockingEnv) {
           MessageBox.warning(
-            "Không thể rollback " + sEnvId + " lúc này!\n\n" +
-            "Môi trường " + sBlockingEnv + " vẫn đang APPROVED với cùng request.\n" +
-            "Phải rollback " + sBlockingEnv + " trước.\n\n" +
-            "Thứ tự bắt buộc: PRD → QAS → DEV",
+            "Cannot rollback " + sEnvId + " right now!\n\n" +
+            "ENV " + sBlockingEnv + " is still APPROVED for the same request.\n" +
+            "You must rollback " + sBlockingEnv + " first.\n\n" +
+            "Required order: PRD → QAS → DEV",
             { title: "Rollback Order Violation", actions: [MessageBox.Action.CLOSE] }
           );
           return;
         }
 
         MessageBox.confirm(
-          "Rollback configuration này?\n" +
+          "Rollback this configuration?\n" +
           "REQ_ID: " + sReqId + " — ENV: " + sEnvId + "\n\n" +
-          "Dữ liệu sẽ được revert về giá trị cũ (OldXxx). Hành động không thể hoàn tác.",
+          "Data will revert to old values (OldXxx). This action cannot be undone.",
           {
             actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
             emphasizedAction: MessageBox.Action.CANCEL,
@@ -1505,10 +1406,10 @@ sap.ui.define(
 
                 this._aCachedAll = null;
                 this._loadRequests();
-                MessageBox.success("Đã rollback thành công — ENV: " + sEnvId + ".");
+                MessageBox.success("Rollback successful — ENV: " + sEnvId + ".");
               } catch (e) {
                 console.error(e);
-                MessageBox.error("Rollback thất bại: " + (e.message || e));
+                MessageBox.error("Rollback failed: " + (e.message || e));
               } finally {
                 oView.setBusy(false);
               }
@@ -1525,14 +1426,14 @@ sap.ui.define(
         const sNextEnv = _getNextEnv(sCurEnv);
 
         if (!sNextEnv) {
-          MessageBox.warning("Request này đã ở PRD — không thể promote thêm.");
+          MessageBox.warning("This request is already at PRD — cannot promote further.");
           return;
         }
 
         MessageBox.confirm(
           "Promote " + sCurEnv + " → " + sNextEnv + "?\n" +
           "REQ_ID: " + oItem.ReqId + "\n\n" +
-          "Các dòng cấu hình sẽ được copy sang " + sNextEnv + " với EnvId mới.",
+          "Config lines will be copied to " + sNextEnv + " with the new EnvId.",
           {
             actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
             emphasizedAction: MessageBox.Action.OK,
@@ -1556,10 +1457,10 @@ sap.ui.define(
 
                 this._aCachedAll = null;
                 this._loadRequests();
-                MessageBox.success("Đã promote thành công lên " + sNextEnv + ".");
+                MessageBox.success("Promote successful to " + sNextEnv + ".");
               } catch (e) {
                 console.error(e);
-                MessageBox.error("Promote thất bại: " + (e.message || e));
+                MessageBox.error("Promote failed: " + (e.message || e));
               } finally {
                 oView.setBusy(false);
               }
@@ -1627,7 +1528,7 @@ sap.ui.define(
         const oCmpModel = this.getView().getModel("cmp");
 
         if (!sModule) {
-          MessageToast.show("Vui lòng chọn Config module.");
+          MessageToast.show("Please select a Config module.");
           return;
         }
 
@@ -1685,7 +1586,7 @@ sap.ui.define(
             if (!bHasDev || !bHasQas || !bHasPrd) bRecordDiff = true;
             if (bRecordDiff) iDiffRecords++;
 
-            const sSyncText  = bRecordDiff ? "Khác nhau" : "Đồng nhất";
+            const sSyncText  = bRecordDiff ? "Different" : "Identical";
             const sSyncState = bRecordDiff ? "Warning"   : "Success";
             const sRowHL     = bRecordDiff ? "Warning"   : "None";
 
@@ -1743,7 +1644,7 @@ sap.ui.define(
 
         } catch (e) {
           console.error("EnvCompare failed:", e);
-          MessageToast.show("Lỗi khi so sánh: " + (e.message || e));
+          MessageToast.show("Compare error: " + (e.message || e));
         }
       },
 

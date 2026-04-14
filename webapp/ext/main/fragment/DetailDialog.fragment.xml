@@ -13,7 +13,7 @@
             <VBox class="sapUiSmallMargin">
 
                 <!-- ── Request Info ──────────────────────────────────────── -->
-                <Panel headerText="Thông tin Request" expandable="false" class="sapUiTinyMarginBottom">
+                <Panel headerText="Request Information" expandable="false" class="sapUiTinyMarginBottom">
                     <HBox wrap="Wrap" class="sapUiSmallMargin" alignItems="Start">
                         <VBox class="sapUiMediumMarginEnd" width="6rem">
                             <Label text="Module" design="Bold"/>
@@ -32,7 +32,7 @@
                             </HBox>
                         </VBox>
                         <VBox class="sapUiMediumMarginEnd" width="8rem">
-                            <Label text="ENV hiện tại" design="Bold"/>
+                            <Label text="Current ENV" design="Bold"/>
                             <ObjectStatus
                                 text="{detail>/curEnv}"
                                 state="{= ${detail>/curEnv} === 'PRD' ? 'Success' :
@@ -41,7 +41,7 @@
                         </VBox>
                         <VBox class="sapUiMediumMarginEnd">
                             <Label text="Reason" design="Bold"/>
-                            <Text text="{= ${detail>/reason} &amp;&amp; ${detail>/reason} !== '-' ? ${detail>/reason} : '(không có)'}"
+                            <Text text="{= ${detail>/reason} &amp;&amp; ${detail>/reason} !== '-' ? ${detail>/reason} : '(none)'}"
                                   wrapping="true" width="16rem"/>
                         </VBox>
                         <VBox>
@@ -73,26 +73,26 @@
                         <Toolbar>
                             <core:Icon src="sap-icon://warning2" color="#E9730C"
                                        size="1rem" class="sapUiTinyMarginEnd"/>
-                            <Title text="{= 'Xác nhận Rollback — ENV: ' + ${detail>/rollbackTargetEnv}}"
+                            <Title text="{= 'Confirm Rollback — ENV: ' + ${detail>/rollbackTargetEnv}}"
                                    level="H5"/>
                             <ToolbarSpacer/>
-                            <Button icon="sap-icon://decline" tooltip="Hủy"
+                            <Button icon="sap-icon://decline" tooltip="Cancel"
                                     type="Transparent" press=".onRollbackCancel"/>
                         </Toolbar>
                     </headerToolbar>
                     <VBox class="sapUiSmallMargin">
                         <MessageStrip
-                            text="{= 'ENV ' + ${detail>/rollbackTargetEnv} + ': toàn bộ dữ liệu sẽ revert về giá trị OldXxx. Hành động không thể hoàn tác!'}"
+                            text="{= 'ENV ' + ${detail>/rollbackTargetEnv} + ': All data will revert to old values. This action cannot be undone!'}"
                             type="Warning" showIcon="true"
                             class="sapUiTinyMarginBottom"/>
-                        <Text text="(Tham khảo Preview bên dưới — cột Giá trị cũ là dữ liệu sau rollback)"
+                        <Text text="(See Preview below — the Old Value column shows data after rollback)"
                               class="sapUiTinyMarginBottom"/>
                         <HBox class="sapUiSmallMarginTop">
-                            <Button text="Xác nhận Rollback"
+                            <Button text="Confirm Rollback"
                                     type="Reject"
                                     icon="sap-icon://undo"
                                     press=".onRollbackConfirm"/>
-                            <Button text="Hủy"
+                            <Button text="Cancel"
                                     press=".onRollbackCancel"
                                     class="sapUiSmallMarginBegin"/>
                         </HBox>
@@ -103,10 +103,10 @@
                 <Panel expandable="true" expanded="true" class="sapUiTinyMarginBottom">
                     <headerToolbar>
                         <Toolbar>
-                            <Title text="Preview thay đổi" level="H4"/>
+                            <Title text="Preview Changes" level="H4"/>
                             <ToolbarSpacer/>
                             <ToggleButton
-                                text="Chỉ hiện thay đổi"
+                                text="Show Changes Only"
                                 icon="sap-icon://filter"
                                 pressed="{detail>/showChangedOnly}"
                                 press=".onToggleChangedOnly"/>
