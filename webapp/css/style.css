@@ -1,216 +1,535 @@
 /* ═══════════════════════════════════════════════════════════════════
-   IT Admin — Configuration Management  |  Custom Stylesheet
-   Layout: f:DynamicPage (chuẩn SAP Fiori, giống catalog app)
+   IT Admin — Configuration Management
+   Layout: FlexibleColumnLayout — My Inbox pattern
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── Title subtitle ─────────────────────────────────────────────── */
-.itadmin-subtitle {
-    font-size: 0.8rem !important;
-    color: #6a6d70 !important;
-    margin-top: 2px !important;
+
+/* ───────────────────────────────────────────────────────────────────
+   0. FCL SHELL — fill the full viewport
+   ─────────────────────────────────────────────────────────────────── */
+
+/* Ensure height propagates through the SAPUI5 component container chain */
+html, body { height: 100% !important; overflow: hidden !important; }
+body > div, #container, #container-uiarea { height: 100% !important; }
+
+.itadmin-fcl.sapFFCL {
+    height: 100% !important;
 }
 
-/* ── KPI Dashboard Row ─────────────────────────────────────────────── */
-.itadmin-kpi-row {
-    gap: 0.875rem;
-    display: flex;
-    padding: 0.5rem 0 0.25rem 0;
-}
-
-/* Card: nền trắng, border-top màu accent, shadow nhẹ */
-.itadmin-kpi-card {
-    background: #FFFFFF;
-    border-radius: 8px;
-    border: 1px solid #E8E8E8;
-    border-top: 3px solid #BDC3CA;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-    padding: 1.125rem 1.25rem 0.875rem 1.25rem;
-    transition: box-shadow 0.2s ease, transform 0.15s ease;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-
-.itadmin-kpi-card:hover {
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.09);
-    transform: translateY(-2px);
-}
-
-.itadmin-kpi-card--dev { border-top-color: #E9730C; }
-.itadmin-kpi-card--qas { border-top-color: #0070F2; }
-.itadmin-kpi-card--prd { border-top-color: #107E3E; }
-.itadmin-kpi-card--all { border-top-color: #8C9BA5; }
-
-.itadmin-kpi-label {
-    font-size: 0.8125rem !important;
-    font-weight: 600 !important;
-    color: #556B82 !important;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    line-height: 1.4 !important;
-}
-
-.itadmin-kpi-number {
-    font-size: 2.75rem !important;
-    font-weight: 700 !important;
-    line-height: 1 !important;
-    margin: 0.375rem 0 0.125rem 0 !important;
-    padding: 0 !important;
-    letter-spacing: -0.02em;
-}
-
-.itadmin-kpi-number--dev { color: #E9730C !important; }
-.itadmin-kpi-number--qas { color: #0070F2 !important; }
-.itadmin-kpi-number--prd { color: #107E3E !important; }
-.itadmin-kpi-number--all { color: #556B82 !important; }
-
-.itadmin-kpi-sub {
-    font-size: 0.75rem !important;
-    color: #A0A8B0 !important;
-    line-height: 1.4 !important;
-    margin-bottom: 0.5rem !important;
-}
-
-.itadmin-kpi-card .sapMBtn {
-    margin-top: auto !important;
-    padding-left: 0 !important;
-    min-height: 1.75rem !important;
-}
-.itadmin-kpi-card .sapMBtnInner {
-    padding-left: 0 !important;
-    color: inherit !important;
-    font-size: 0.8rem !important;
-}
-
-/* ── IconTabBar ─────────────────────────────────────────────────── */
-.itadmin-module-tabs .sapMITBHead,
-.itadmin-module-tabs > .sapMITB {
-    border-top: none !important;
-    border-bottom: none !important;
+/* Remove the FCL column separator shadow to get a clean split */
+.itadmin-fcl .sapFFCLColumn {
     box-shadow: none !important;
 }
 
-/* ── Filter bar ─────────────────────────────────────────────────── */
-.itadmin-filter-bar {
+.itadmin-fcl .sapFFCLColumnSeparator {
+    background: #D9DCE0 !important;
+    width: 1px !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   1. MASTER PAGE — page chrome
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-master-page.sapMPage {
     background: #FFFFFF !important;
-    border: 1px solid #E8E8E8 !important;
-    border-radius: 8px 8px 0 0 !important;
-    padding: 0.625rem 1rem !important;
-    margin: 0 !important;
-    min-height: 3rem !important;
 }
 
-.itadmin-filter-label {
-    font-weight: 600 !important;
-    color: #556B82 !important;
-    white-space: nowrap;
-    margin-right: 0.5rem !important;
+/* enableScrolling="true" → SAP wraps content in sapMScrollContScroll.
+   We set background and let SAP handle the scroll. */
+.itadmin-master-page .sapMPageContent,
+.itadmin-master-page .sapMScrollContScroll {
+    background: #FFFFFF !important;
 }
 
-.itadmin-filter-sep {
-    margin: 0 0.875rem !important;
-    background: #E0E0E0;
-    height: 1.5rem !important;
-    align-self: center;
+
+/* ───────────────────────────────────────────────────────────────────
+   2. MASTER HEADER — sticky white bar (content-based, not customHeader)
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-master-hdr.sapMHBox {
+    background: #FFFFFF !important;
+    border-bottom: 1px solid #D9DCE0 !important;
+    padding: 0.625rem 0.875rem !important;
+    min-height: 3.25rem !important;
+    box-sizing: border-box !important;
+    /* Sticky within the SAP ScrollContainer */
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
 }
 
-.itadmin-filter-action-btn {
-    margin-left: 0.375rem !important;
+.itadmin-master-title .sapMTitleInner {
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    color: #32363A !important;
+    line-height: 1.3 !important;
 }
 
-.itadmin-filter-bar .sapMTBContent {
+/* KPI row below title */
+.itadmin-kpi-row.sapMHBox {
+    margin-top: 0.15rem !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
 }
 
-.itadmin-filter-bar .sapMDRS,
-.itadmin-filter-bar .sapMSF {
-    border-radius: 6px !important;
+.itadmin-kpi-row .sapMObjStatus .sapMObjStatusText {
+    font-size: 0.6875rem !important;
+    font-weight: 600 !important;
 }
 
-/* ── Table ──────────────────────────────────────────────────────── */
-.itadmin-table.sapMList {
+.itadmin-kpi-total.sapMText {
+    font-size: 0.6875rem !important;
+    color: #89919A !important;
+    line-height: 1.4 !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   3. MODULE TABS
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-module-tabs.sapMITB {
+    background: #FFFFFF !important;
+    border-bottom: 1px solid #D9DCE0 !important;
+    /* Sticky just below the master header (~3.25rem tall) */
+    position: sticky !important;
+    top: 3.25rem !important;
+    z-index: 9 !important;
+}
+
+.itadmin-module-tabs .sapMITBHead {
+    background: #FFFFFF !important;
+}
+
+.itadmin-module-tabs .sapMITBContentArrow {
+    display: none !important;
+}
+
+/* Tab content area of module tabs — zero height (empty <content/>) */
+.itadmin-module-tabs .sapMITBContainerDiv,
+.itadmin-module-tabs .sapMITBContent {
+    padding: 0 !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   4. FILTER STRIP
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-filter-strip.sapMVBox {
+    background: #F7F7F7 !important;
+    border-bottom: 1px solid #E8E8E8 !important;
+    padding: 0.5rem 0.875rem !important;
+    gap: 0.375rem !important;
+    /* Sticky below header (3.25rem) + module tabs (~2.5rem) */
+    position: sticky !important;
+    top: 5.75rem !important;
+    z-index: 8 !important;
+}
+
+.itadmin-filter-strip .sapMSF {
+    width: 100% !important;
+}
+
+.itadmin-filter-row.sapMHBox {
+    gap: 0.375rem !important;
+    flex-wrap: wrap !important;
+}
+
+.itadmin-env-seg.sapMSegB {
+    height: 2rem !important;
+}
+
+.itadmin-env-seg .sapMSegBBtn {
+    font-size: 0.75rem !important;
+    height: 2rem !important;
+    min-width: 3.25rem !important;
+    line-height: 2rem !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   5. INBOX LIST  — white bg, separator lines, fills remaining height
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-inbox-list.sapMList {
+    background: #FFFFFF !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.itadmin-inbox-list .sapMListUl,
+.itadmin-inbox-list > ul {
+    background: #FFFFFF !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   6. LIST ITEM — card feel with left-border selection
+   ─────────────────────────────────────────────────────────────────── */
+
+/* Base state */
+.itadmin-inbox-item.sapMLIB {
+    border-left: 3px solid transparent !important;
+    background: #FFFFFF !important;
+    cursor: pointer !important;
+    transition: background 0.1s;
+}
+
+/* Hover */
+.itadmin-inbox-item.sapMLIB:hover {
+    background: #F5F6F7 !important;
+}
+
+/* Selected — light blue tint + blue left border */
+.itadmin-inbox-item.sapMLIBSelected.sapMLIB {
+    background: #EEF4FF !important;
+    border-left-color: #0070F2 !important;
+}
+
+/* Kill SAP highlight bar — we use border-left instead */
+.itadmin-inbox-item .sapMLIBHighlight {
+    display: none !important;
+}
+
+/* Remove SAP's own content padding */
+.itadmin-inbox-item .sapMLIBContent {
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   7. ITEM BODY — typography (My Inbox spacing)
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-item-body.sapMVBox {
+    padding: 0.75rem 1rem 0.7rem 0.875rem !important;
+    gap: 0.25rem !important;
+    width: 100% !important;
+}
+
+/* Title */
+.itadmin-item-title.sapMText {
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    color: #32363A !important;
+    line-height: 1.35 !important;
+}
+
+/* Meta row */
+.itadmin-item-meta.sapMHBox {
+    margin-top: 0.125rem !important;
+}
+
+/* Meta small text */
+.itadmin-meta-txt.sapMText {
+    font-size: 0.75rem !important;
+    color: #89919A !important;
+    line-height: 1.4 !important;
+}
+
+/* ENV badge (top right) */
+.itadmin-item-env.sapMObjStatus {
+    font-size: 0.6875rem !important;
+    flex-shrink: 0 !important;
+    margin-top: 0.1rem !important;
+}
+
+/* Status badge */
+.itadmin-item-status.sapMObjStatus .sapMObjStatusText {
+    font-size: 0.6875rem !important;
+    font-weight: 600 !important;
+}
+
+/* Key info row (gray, smallest) */
+.itadmin-item-key.sapMText {
+    font-size: 0.6875rem !important;
+    color: #B0B8C1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    margin-top: 0.1rem !important;
+}
+
+/* Module / action pill */
+.itadmin-mod-pill.sapMObjStatus {
+    font-size: 0.6875rem !important;
+}
+
+.itadmin-mod-pill .sapMObjStatusText {
+    font-size: 0.6875rem !important;
+    font-weight: 600 !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   DETAIL PAGE
+   ═══════════════════════════════════════════════════════════════════ */
+
+
+/* ───────────────────────────────────────────────────────────────────
+   8. DETAIL PAGE — page chrome
+   enableScrolling="true" → SAP wraps content in sapMScrollContScroll,
+   which scrolls natively. We just set the background.
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-detail-page.sapMPage {
+    background: #F5F6F7 !important;
+}
+
+.itadmin-detail-page .sapMPageContent {
+    background: #F5F6F7 !important;
+}
+
+/* The actual scroll container SAP generates with enableScrolling="true" */
+.itadmin-detail-page .sapMScrollContScroll {
+    background: #F5F6F7 !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   9. DETAIL HEADER — sticky white bar (content-based)
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-detail-hdr.sapMHBox {
+    background: #FFFFFF !important;
+    border-bottom: 1px solid #D9DCE0 !important;
+    padding: 0.75rem 1rem !important;
+    min-height: 3.75rem !important;
+    /* sticky works relative to the SAP ScrollContainer (sapMScrollContScroll) */
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    box-sizing: border-box !important;
+}
+
+.itadmin-back-btn.sapMBtn {
+    flex-shrink: 0 !important;
+    margin-right: 0.25rem !important;
+}
+
+.itadmin-detail-hdr-content.sapMVBox {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    gap: 0.15rem !important;
+}
+
+.itadmin-detail-title .sapMTitleInner {
+    font-size: 0.9375rem !important;
+    font-weight: 700 !important;
+    color: #32363A !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.itadmin-detail-subtitle.sapMHBox {
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   10. DETAIL TAB BAR
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-detail-tabs.sapMITB {
+    background: #FFFFFF !important;
+    border-bottom: 1px solid #D9DCE0 !important;
+    margin-top: 0.5rem !important;
+}
+
+.itadmin-detail-tabs .sapMITBHead {
+    background: #FFFFFF !important;
+    padding: 0 1rem !important;
+}
+
+.itadmin-detail-tabs .sapMITBFilter {
+    font-size: 0.8125rem !important;
+    padding: 0.25rem 1rem !important;
+}
+
+/* Selected tab: blue text + underline indicator */
+.itadmin-detail-tabs .sapMITBSelected .sapMITBFilterKey {
+    color: #0070F2 !important;
+    font-weight: 600 !important;
+}
+
+.itadmin-detail-tabs .sapMITBContentArrow {
+    display: none !important;
+}
+
+/* Tab content background */
+.itadmin-detail-tabs .sapMITBContainerDiv,
+.itadmin-detail-tabs .sapMITBContent {
+    background: #F5F6F7 !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   11. TAB PANEL content area
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-tab-content.sapMVBox {
+    padding: 1.25rem 1rem !important;
+    gap: 1rem !important;
+    background: #F5F6F7 !important;
+}
+
+/* Preview tab toolbar */
+.itadmin-preview-bar.sapMTB {
+    background: transparent !important;
+    border-bottom: 1px solid #E8E8E8 !important;
+    min-height: 2.25rem !important;
+    padding: 0 !important;
+    margin-bottom: 0.5rem !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   12. JOURNEY row (white card inside gray tab area)
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-journey-box.sapMHBox {
+    background: #FFFFFF !important;
     border: 1px solid #E8E8E8 !important;
-    border-top: none !important;
-    border-radius: 0 0 8px 8px !important;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
-    overflow: hidden;
+    border-radius: 8px !important;
+    padding: 1.5rem 1rem !important;
+    min-height: 9rem !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
 }
 
-/* ── Preview diff inner table ───────────────────────────────────── */
+/* Journey node HTML cards */
+.itadmin-journey-card {
+    padding: 0.875rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid #E8EAED;
+    background: #FAFAFA;
+    min-width: 8.5rem;
+    align-items: center;
+    transition: box-shadow 0.2s;
+}
+.itadmin-journey-card--current { background: #EEF4FF; border-color: #91B9F7; box-shadow: 0 2px 10px rgba(0,112,242,.12); }
+.itadmin-journey-card--done    { background: #F0FAF3; border-color: #7DC9A0; }
+
+.itadmin-journey-circle2 {
+    width: 3rem; height: 3rem; border-radius: 50%;
+    background: #E0E0E0; border: 2.5px solid #C8C8C8;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 0.5rem;
+}
+.itadmin-journey-circle2--current { background:#0070F2; border-color:#0070F2; box-shadow:0 0 0 5px rgba(0,112,242,.18); }
+.itadmin-journey-circle2--done    { background:#107E3E; border-color:#107E3E; }
+
+.itadmin-journey-env-label { font-size: 0.9375rem !important; font-weight: 700 !important; color: #32363A !important; }
+.itadmin-journey-meta      { font-size: 0.6875rem !important; color: #89919A !important; text-align: center !important; line-height: 1.5 !important; }
+.itadmin-journey-arrow     { padding: 0 0.25rem; flex-shrink: 0; }
+
+
+/* ───────────────────────────────────────────────────────────────────
+   13. ROLLBACK CONFIRM panel
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-rollback-panel.sapMPanel {
+    background: #FFFBF5 !important;
+    border: 1px solid #F5A623 !important;
+    border-left: 3px solid #E9730C !important;
+    border-radius: 6px !important;
+    overflow: hidden !important;
+}
+
+.itadmin-rollback-panel .sapMPanelHdr {
+    background: #FFF5E6 !important;
+    border-bottom: 1px solid #FAD4A0 !important;
+    min-height: 2.5rem !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   14. INFO TAB — field grid
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-info-tab.sapMVBox {
+    background: #FFFFFF !important;
+    border-radius: 8px !important;
+    border: 1px solid #E8E8E8 !important;
+    overflow: hidden !important;
+}
+
+.itadmin-info-fields.sapMHBox {
+    padding: 1rem 1.25rem !important;
+    gap: 0 !important;
+    flex-wrap: wrap !important;
+}
+
+.itadmin-info-field {
+    min-width: 10rem;
+    margin-right: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   15. FOOTER ACTION BAR — My Inbox bottom toolbar
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-action-footer.sapMTB {
+    background: #FFFFFF !important;
+    border-top: 1px solid #D9DCE0 !important;
+    padding: 0 0.75rem !important;
+    min-height: 3rem !important;
+    box-shadow: 0 -2px 6px rgba(0,0,0,0.06) !important;
+}
+
+.itadmin-action-footer .sapMBtnAccept .sapMBtnInner {
+    font-weight: 600 !important;
+    letter-spacing: 0.01em !important;
+}
+
+.itadmin-action-footer .sapMBtnReject .sapMBtnInner {
+    font-weight: 600 !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   16. AUDIT PANEL — default right-panel view (Audit Trail)
+   ─────────────────────────────────────────────────────────────────── */
+
+/* The audit list in the mid column — no fixed height, page scroll handles it */
+.itadmin-audit-list.sapMList {
+    background: #FFFFFF !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.itadmin-audit-list .sapMListUl,
+.itadmin-audit-list > ul {
+    background: #FFFFFF !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Filter strip inside the right panel audit section — override left panel's top value */
+.itadmin-audit-panel > .itadmin-filter-strip.sapMVBox {
+    top: 3.25rem !important;   /* below the audit Trail header only */
+    z-index: 9 !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   17. PREVIEW DIFF table (inside Preview tab)
+   ─────────────────────────────────────────────────────────────────── */
+
 .itadmin-diff-inner-table.sapMList {
     border: none !important;
     box-shadow: none !important;
     background: transparent !important;
 }
-.itadmin-diff-inner-table .sapMListTbl {
-    background: transparent !important;
-}
-
-/* ── Promote Journey ────────────────────────────────────────────── */
-.itadmin-journey-card {
-    padding: 1rem 0.75rem;
-    border-radius: 10px;
-    border: 1px solid #E8E8E8;
-    background: #FAFAFA;
-    min-width: 9rem;
-    transition: box-shadow 0.2s;
-}
-
-.itadmin-journey-card--current {
-    background: #EEF4FF;
-    border-color: #91B9F7;
-    box-shadow: 0 2px 10px rgba(0, 112, 242, 0.12);
-}
-
-.itadmin-journey-card--done {
-    background: #F0FAF3;
-    border-color: #7DC9A0;
-}
-
-.itadmin-journey-circle2 {
-    width: 3.25rem;
-    height: 3.25rem;
-    border-radius: 50%;
-    background: #E0E0E0;
-    border: 2.5px solid #C8C8C8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 0.625rem;
-}
-
-.itadmin-journey-circle2--current {
-    background: #0070F2;
-    border-color: #0070F2;
-    box-shadow: 0 0 0 5px rgba(0, 112, 242, 0.18);
-}
-
-.itadmin-journey-circle2--done {
-    background: #107E3E;
-    border-color: #107E3E;
-}
-
-.itadmin-journey-env-label {
-    font-size: 1rem !important;
-    font-weight: 700 !important;
-    color: #32363A !important;
-    margin-top: 0.125rem !important;
-}
-
-.itadmin-journey-meta {
-    font-size: 0.75rem !important;
-    color: #89919A !important;
-    text-align: center !important;
-    line-height: 1.5 !important;
-}
-
-.itadmin-journey-arrow {
-    padding: 0 0.25rem;
-    margin-top: -0.5rem;
-}
-
-/* ── Action badge colors ────────────────────────────────────────── */
-.itadmin-action-create { background: #107E3E !important; color: #fff !important; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; font-weight: 700; }
-.itadmin-action-delete { background: #BB0000 !important; color: #fff !important; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; font-weight: 700; }
-.itadmin-action-update { background: #E9730C !important; color: #fff !important; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; font-weight: 700; }

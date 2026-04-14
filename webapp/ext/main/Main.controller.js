@@ -116,13 +116,17 @@ sap.ui.define(
         this._sSelectedModule = "MM";
         this._oVersionData    = {};
         this._oReqModuleMap   = {};
-        this._aCachedAll      = null; // cache toàn bộ data sau lần fetch đầu
+        this._aCachedAll      = null;
+        // FCL layout model — start with both columns visible
+        this.getView().setModel(
+          new JSONModel({ layout: "TwoColumnsMidExpanded", showDetail: false }),
+          "fcl"
+        );
         this.getView().setModel(
           new JSONModel({
             atDev: 0, atQas: 0, atPrd: 0, total: 0,
             mmCount: 0, mmssCount: 0, fiCount: 0, sdCount: 0,
             selectedModule: "MM", selectedLabel: _SERVICES["MM"].label, selectedVer: "-",
-            isAuditMode: false,
           }),
           "kpi"
         );
@@ -138,6 +142,22 @@ sap.ui.define(
           new JSONModel({ rows: [], allRows: [], diffsOnly: false, totalKeys: 0, diffCount: 0 }),
           "cmp"
         );
+        this.getView().setModel(
+          new JSONModel({
+            isAuditDefault: true,
+            reqId: "", module: "", confName: "", by: "", reason: "",
+            curEnv: "", nextEnv: "",
+            isPromoteMode: false, promoteEnabled: false,
+            showRollbackConfirm: false, rollbackTargetEnv: "",
+            lines: [], linesDisplay: [], journey: [],
+            showChangedOnly: false,
+            activeTab: "PREVIEW",
+            devNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
+            qasNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
+            prdNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
+          }),
+          "detail"
+        );
         // Load danh sách đã đọc từ localStorage
         try {
           this._oSeenNotifs = new Set(JSON.parse(localStorage.getItem("itadmin_seen_notifs") || "[]"));
@@ -146,6 +166,7 @@ sap.ui.define(
         this._loadRequests();
         this._loadModuleVersions();
         this._startNotifPolling();
+        this._loadAuditTrail();
       },
 
       onExit: function () {
@@ -536,15 +557,11 @@ sap.ui.define(
         const sKey = oEvent.getParameter("key");
         const oKpi = this.getView().getModel("kpi");
 
-        if (sKey === "AUDIT") {
-          oKpi.setProperty("/isAuditMode", true);
-          oKpi.setProperty("/selectedModule", "");
-          this._sSelectedModule = "";
-          this._loadAuditTrail();
-          return;
-        }
+        // Clear list selection and revert right panel to Audit Trail default
+        const oReqList = this.byId("requestList");
+        if (oReqList) oReqList.removeSelections(true);
+        this.getView().getModel("detail").setProperty("/isAuditDefault", true);
 
-        oKpi.setProperty("/isAuditMode", false);
         this._sSelectedModule = sKey;
 
         if (this._sSelectedModule) {
@@ -659,7 +676,12 @@ sap.ui.define(
 
       onAuditDiffPress: async function (oEvent) {
         const oCtx  = oEvent.getSource().getParent().getBindingContext("vm");
+        if (!oCtx) return;
         const oItem = oCtx.getObject();
+        await this._openAuditDiffForItem(oItem);
+      },
+
+      _openAuditDiffForItem: async function (oItem) {
 
         // Parse JSON → mảng {field, value, changed}
         var _parseFields = function (sJson) {
@@ -722,53 +744,79 @@ sap.ui.define(
         if (this._oAuditDiffDialog) this._oAuditDiffDialog.close();
       },
 
-      // ─── Row action → open dialog ─────────────────────────────────────────────
+      // ─── List selection → open detail panel ──────────────────────────────────
+
+      onRequestListSelect: function (oEvent) {
+        // selectionChange fires twice when switching items: once for deselection (selected=false)
+        // and once for selection (selected=true). Skip the deselection event.
+        if (oEvent.getParameter("selected") === false) return;
+
+        const oLI = oEvent.getParameter("listItem");
+        if (!oLI || !oLI.getBindingContext) return;
+        const oCtx = oLI.getBindingContext("vm");
+        const oItem = oCtx ? oCtx.getObject() : null;
+        if (!oItem) return;
+
+        this._oCurrentItem = oItem;
+        const sNullUuid = "00000000-0000-0000-0000-000000000000";
+        if (!oItem.ReqId || oItem.ReqId === sNullUuid) {
+          MessageBox.warning("Không tìm thấy Request ID cho record này.");
+          return;
+        }
+        this._openDetailPanel(oItem, !!oItem._nextEnv);
+      },
+
+      onAuditListSelect: function (oEvent) {
+        if (oEvent.getParameter("selected") === false) return;
+        const oLI = oEvent.getParameter("listItem");
+        if (!oLI || !oLI.getBindingContext) return;
+        const oCtx = oLI.getBindingContext("vm");
+        if (!oCtx) return;
+        this._openAuditDiffForItem(oCtx.getObject());
+      },
+
+      // ─── Detail back (close mid column) ──────────────────────────────────────
+
+      onDetailBack: function () {
+        // Stay two-column — revert right panel to Audit Trail default view
+        this.getView().getModel("detail").setProperty("/isAuditDefault", true);
+        const oList = this.byId("requestList");
+        if (oList) oList.removeSelections(true);
+      },
+
+      // ─── Row action → open detail (legacy entry point kept for compat) ────────
 
       onActionPress: function (oEvent) {
         const oCtx  = oEvent.getSource().getParent().getBindingContext("vm");
-        const oItem = oCtx.getObject(); // plain JS object from JSONModel
+        if (!oCtx) return;
+        const oItem = oCtx.getObject();
         this._oCurrentItem = oItem;
-
-        // Guard: items with a zero/null UUID have no header record — nothing to show
         const sNullUuid = "00000000-0000-0000-0000-000000000000";
         if (!oItem.ReqId || oItem.ReqId === sNullUuid) {
           MessageBox.warning("Không tìm thấy Request ID cho record này.\nRecord có thể được tạo thủ công ngoài luồng request.");
           return;
         }
-
-        const bIsPromote = !!oItem._nextEnv; // có nextEnv → còn promote được
-        this._openDetailDialog(oItem, bIsPromote);
+        this._openDetailPanel(oItem, !!oItem._nextEnv);
       },
 
-      // ─── Detail dialog ────────────────────────────────────────────────────────
+      // ─── Detail panel (inline FCL mid column) ─────────────────────────────────
 
-      _openDetailDialog: async function (oItem, bIsPromote, bAutoRollback) {
+      _openDetailPanel: async function (oItem, bIsPromote, bAutoRollback) {
         const sReqId   = oItem.ReqId;
         const sModule  = oItem.ModuleId;
         const sCurEnv  = oItem.EnvId  || "DEV";
         const sNextEnv = _getNextEnv(sCurEnv) || "—";
 
-        if (!this._oDetailDialog) {
-          this._oDetailDialog = await Fragment.load({
-            id: this.getView().getId(),
-            name: "zgsp26.conf.mng.itadmin.ext.main.fragment.DetailDialog",
-            controller: this,
-          });
-          this._oDetailDialog.setModel(
-            new JSONModel({
-              reqId: "", module: "", confName: "", by: "", reason: "",
-              curEnv: "", nextEnv: "",
-              isPromoteMode: false, isRollbackMode: false, promoteEnabled: false,
-              lines: [], journey: [],
-            }),
-            "detail"
-          );
-          this.getView().addDependent(this._oDetailDialog);
-        }
+        // Cancellation token — increment a counter so any in-flight fetch
+        // for a previously-clicked item discards its result.
+        this._iDetailSeq = (this._iDetailSeq || 0) + 1;
+        const iSeq = this._iDetailSeq;
 
         this._oCurrentSvc = _SERVICES[sModule];
 
-        this._oDetailDialog.getModel("detail").setData({
+        // Populate the detail model (it lives on the View, not on a dialog)
+        const oModel = this.getView().getModel("detail");
+        oModel.setData({
           reqId:    sReqId,
           module:   sModule,
           confName: "-",
@@ -782,39 +830,46 @@ sap.ui.define(
           rollbackTargetEnv:   bAutoRollback ? sCurEnv : "",
           lines: [], linesDisplay: [], journey: [],
           showChangedOnly: false,
-          previewTab: "RECORDS",
           devNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
           qasNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
           prdNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
         });
 
-        this.byId("previewTableContainer") && this.byId("previewTableContainer").destroyItems();
-        this._oDetailDialog.open();
+        // Clear dynamic containers
+        const oPreview = this.byId("previewTableContainer");
+        if (oPreview) oPreview.destroyItems();
+        const oJourney = this.byId("journeyContainer");
+        if (oJourney) oJourney.destroyItems();
+
+        // Reset tab to Preview (first tab — shows what changed)
+        const oTabBar = this.byId("detailTabBar");
+        if (oTabBar) oTabBar.setSelectedKey("PREVIEW");
+
+        // Open FCL mid column and switch right panel to request detail
+        this.getView().getModel("fcl").setProperty("/layout", "TwoColumnsMidExpanded");
+        this.getView().getModel("detail").setProperty("/isAuditDefault", false);
 
         Promise.all([
           this._fetchConfigLines(sReqId, sModule),
           this._fetchJourney(sReqId, sCurEnv),
           this._fetchReqHeader(sReqId, sCurEnv),
         ]).then(([aLines, aJourney, oHeader]) => {
-          const oModel = this._oDetailDialog.getModel("detail");
+          // Discard result if user already clicked a different item
+          if (this._iDetailSeq !== iSeq) return;
+
           oModel.setProperty("/lines",   aLines);
           oModel.setProperty("/journey", aJourney);
 
-          // Build journey stepper nodes
           const oNodes = _buildJourneyNodes(aJourney);
           oModel.setProperty("/devNode", oNodes.dev);
           oModel.setProperty("/qasNode", oNodes.qas);
           oModel.setProperty("/prdNode", oNodes.prd);
 
-          // Render journey UI
           this._buildJourneyUI(oNodes);
 
-          // Apply changed-only filter if active
-          const bFilter = oModel.getProperty("/showChangedOnly");
+          const bFilter  = oModel.getProperty("/showChangedOnly");
           const aDisplay = bFilter ? aLines.filter(function (l) { return l.changed; }) : aLines;
           oModel.setProperty("/linesDisplay", aDisplay);
-
-          // Build dynamic preview table
           this._buildPreviewTable(aDisplay);
 
           if (oHeader.ReqTitle)  oModel.setProperty("/confName", oHeader.ReqTitle);
@@ -822,6 +877,7 @@ sap.ui.define(
           if (oHeader.CreatedBy) oModel.setProperty("/by",       oHeader.CreatedBy);
           oModel.setProperty("/promoteEnabled", true);
         }).catch((e) => {
+          if (this._iDetailSeq !== iSeq) return;
           console.error(e);
           const oContainer = this.byId("previewTableContainer");
           if (oContainer) {
@@ -1053,15 +1109,20 @@ sap.ui.define(
 
       // ─── Dialog: Toggle changed-only filter ──────────────────────────────────
 
+      onDetailTabSelect: function (oEvent) {
+        const sKey = oEvent.getParameter("key");
+        this.getView().getModel("detail").setProperty("/activeTab", sKey);
+      },
+
       onPreviewTabSelect: function (oEvent) {
         const sKey = oEvent.getParameter("key");
-        this._oDetailDialog.getModel("detail").setProperty("/previewTab", sKey);
+        this.getView().getModel("detail").setProperty("/previewTab", sKey);
       },
 
       onToggleChangedOnly: function (oEvent) {
         const bPressed = oEvent.getSource().getPressed();
-        const oModel = this._oDetailDialog.getModel("detail");
-        const aAll = oModel.getProperty("/lines");
+        const oModel   = this.getView().getModel("detail");
+        const aAll     = oModel.getProperty("/lines");
         oModel.setProperty("/showChangedOnly", bPressed);
         const aFiltered = bPressed ? aAll.filter(function (l) { return l.changed; }) : aAll;
         oModel.setProperty("/linesDisplay", aFiltered);
@@ -1301,10 +1362,9 @@ sap.ui.define(
       // ─── Dialog: Quick rollback từ table row ─────────────────────────────────
       //   Nhấn nút ↩ trực tiếp ở bảng → check order → mở dialog ở chế độ confirm
 
-      onQuickRollbackPress: async function (oEvent) {
-        const oCtx  = oEvent.getSource().getParent().getBindingContext("vm");
-        const oItem = oCtx.getObject();
-        this._oCurrentItem = oItem;
+      onQuickRollbackPress: async function () {
+        const oItem = this._oCurrentItem;
+        if (!oItem) return;
 
         const oView = this.getView();
         oView.setBusy(true);
@@ -1324,7 +1384,7 @@ sap.ui.define(
 
         // Mở dialog với confirm panel đã sẵn sàng (bAutoRollback = true)
         const bIsPromote = oItem.EnvId !== "PRD";
-        await this._openDetailDialog(oItem, bIsPromote, true);
+        await this._openDetailPanel(oItem, bIsPromote, true);
       },
 
       // ─── Dialog: Rollback node button — hiện confirm panel inline ────────────
@@ -1349,7 +1409,7 @@ sap.ui.define(
           return;
         }
 
-        const oModel = this._oDetailDialog.getModel("detail");
+        const oModel = this.getView().getModel("detail");
         oModel.setProperty("/rollbackTargetEnv",   sEnv);
         oModel.setProperty("/showRollbackConfirm", true);
       },
@@ -1357,12 +1417,12 @@ sap.ui.define(
       // ─── Dialog: Xác nhận rollback (từ inline confirm panel) ─────────────────
 
       onRollbackConfirm: async function () {
-        const oModel = this._oDetailDialog.getModel("detail");
+        const oModel = this.getView().getModel("detail");
         const sEnvId = oModel.getProperty("/rollbackTargetEnv");
         const sReqId = this._oCurrentItem.ReqId;
 
         oModel.setProperty("/showRollbackConfirm", false);
-        this._oDetailDialog.close();
+        this.onDetailBack();
 
         const oView = this.getView();
         oView.setBusy(true);
@@ -1393,7 +1453,7 @@ sap.ui.define(
       // ─── Dialog: Hủy rollback ─────────────────────────────────────────────────
 
       onRollbackCancel: function () {
-        this._oDetailDialog.getModel("detail").setProperty("/showRollbackConfirm", false);
+        this.getView().getModel("detail").setProperty("/showRollbackConfirm", false);
       },
 
       // ─── Dialog: Rollback ─────────────────────────────────────────────────────
@@ -1428,7 +1488,7 @@ sap.ui.define(
             emphasizedAction: MessageBox.Action.CANCEL,
             onClose: async (sResult) => {
               if (sResult !== MessageBox.Action.OK) return;
-              this._oDetailDialog.close();
+              this.onDetailBack();
               oView.setBusy(true);
               try {
                 await this._execBoundAction(sReqId, sEnvId, "rollback");
@@ -1478,7 +1538,7 @@ sap.ui.define(
             emphasizedAction: MessageBox.Action.OK,
             onClose: async (sResult) => {
               if (sResult !== MessageBox.Action.OK) return;
-              this._oDetailDialog.close();
+              this.onDetailBack();
               const oView = this.getView();
               oView.setBusy(true);
               try {
@@ -1508,10 +1568,10 @@ sap.ui.define(
         );
       },
 
-      // ─── Dialog: Close ────────────────────────────────────────────────────────
+      // ─── Dialog: Close (alias for FCL back) ──────────────────────────────────
 
       onDialogClose: function () {
-        this._oDetailDialog.close();
+        this.onDetailBack();
       },
 
       // ─── Refresh ──────────────────────────────────────────────────────────────
@@ -1525,12 +1585,28 @@ sap.ui.define(
       // ─── Environment Comparison ───────────────────────────────────────────────
 
       onEnvCompareOpen: function () {
-        const _reset = () => {
+        // If a request is currently open in the detail panel, pre-select its module
+        const bHasRequest = !this.getView().getModel("detail").getProperty("/isAuditDefault")
+                            && !!this._oCurrentItem;
+        const sDefaultModule = bHasRequest ? (this._oCurrentItem.ModuleId || "") : "";
+
+        const _openAndRun = () => {
+          // Reset data first
           this.getView().getModel("cmp").setData({
             rows: [], allRows: [], diffsOnly: false,
             totalKeys: 0, diffCount: 0,
           });
+          this._oEnvCompareDialog.open();
+          // Auto-fill module and run compare when opened from a selected request
+          if (sDefaultModule) {
+            const oCmpModule = this.byId("cmpModule");
+            if (oCmpModule) {
+              oCmpModule.setSelectedKey(sDefaultModule);
+              this.onEnvCompareRun();
+            }
+          }
         };
+
         if (!this._oEnvCompareDialog) {
           Fragment.load({
             id:         this.getView().getId(),
@@ -1539,12 +1615,10 @@ sap.ui.define(
           }).then((oDialog) => {
             this._oEnvCompareDialog = oDialog;
             this.getView().addDependent(oDialog);
-            _reset();
-            oDialog.open();
+            _openAndRun();
           });
         } else {
-          _reset();
-          this._oEnvCompareDialog.open();
+          _openAndRun();
         }
       },
 

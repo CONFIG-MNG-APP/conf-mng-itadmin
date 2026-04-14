@@ -62,7 +62,7 @@
                         </Toolbar>
                     </headerToolbar>
                     <!-- Journey được render bởi controller -->
-                    <HBox id="journeyContainer" alignItems="Center" justifyContent="Center"
+                    <HBox id="dlgJourneyContainer" alignItems="Center" justifyContent="Center"
                           class="sapUiSmallMargin"/>
                 </Panel>
 
@@ -114,7 +114,7 @@
                     </headerToolbar>
 
                     <!-- Bảng dynamic — columns được build bởi controller qua _buildPreviewTable() -->
-                    <VBox id="previewTableContainer"/>
+                    <VBox id="dlgPreviewTableContainer"/>
 
                 </Panel>
 
