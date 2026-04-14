@@ -107,7 +107,7 @@ sap.ui.define(
         EnvId:    sEnv,
         ModuleId: oReq.ModuleId || "",
         title:    oReq.ReqTitle || oReq.ReqId,
-        message:  "Manager đã duyệt tại " + sEnv + " — [" + sModLabel + "] sẵn sàng promote",
+        message:  "Approved at " + sEnv + " — [" + sModLabel + "] ready to promote",
         icon:     "sap-icon://accept",
         state:    "Success",
         time:     _formatTime(oReq.ChangedAt),

@@ -9,9 +9,6 @@
    ─────────────────────────────────────────────────────────────────── */
 
 /* Ensure height propagates through the SAPUI5 component container chain */
-html, body { height: 100% !important; overflow: hidden !important; }
-body > div, #container, #container-uiarea { height: 100% !important; }
-
 .itadmin-fcl.sapFFCL {
     height: 100% !important;
 }

@@ -41,6 +41,7 @@
   },
   "sap.ui": {
     "technology": "UI5",
+    "theme": "sap_horizon",
     "deviceTypes": { "desktop": true, "tablet": true, "phone": true }
   },
   "sap.ui5": {
