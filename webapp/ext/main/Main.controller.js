@@ -905,6 +905,7 @@ sap.ui.define(
             totalFields:   aFields.length,
             fields:        aFields,
             keyFieldDiffs: aKeyFieldDiffs,
+            versionNo:     oItem.VersionNo != null ? oItem.VersionNo : null,
           });
         });
         return aRows;
@@ -1171,6 +1172,13 @@ sap.ui.define(
           }));
         });
 
+        // Version column
+        aColumns.push(new sap.m.Column({
+          width: "5.5rem",
+          hAlign: "Center",
+          header: new sap.m.Text({ text: "Ver." }),
+        }));
+
         // Build rows
         const aItems = aRows.map(function (oRow) {
           const oCLI = new sap.m.ColumnListItem({
@@ -1246,6 +1254,14 @@ sap.ui.define(
               }));
             }
           });
+
+          // Version cell — hiển thị VersionNo của record
+          const sVer = oRow.versionNo != null ? "v" + oRow.versionNo : "—";
+          oCLI.addCell(new sap.m.ObjectStatus({
+            text: sVer,
+            state: oRow.versionNo != null ? "Information" : "None",
+            inverted: oRow.versionNo != null,
+          }));
 
           return oCLI;
         });
@@ -1590,7 +1606,37 @@ sap.ui.define(
             const sSyncState = bRecordDiff ? "Warning"   : "Success";
             const sRowHL     = bRecordDiff ? "Warning"   : "None";
 
-            // Build 1 row per diff field, mark _showKey only on first field
+            // ── Version row — luôn là row đầu tiên của mỗi record group ──────
+            const sDevVer = bHasDev ? ("v" + (oMapDev[sKey].VersionNo || 0)) : "—";
+            const sQasVer = bHasQas ? ("v" + (oMapQas[sKey].VersionNo || 0)) : "—";
+            const sPrdVer = bHasPrd ? ("v" + (oMapPrd[sKey].VersionNo || 0)) : "—";
+            const aVerVals = [sDevVer, sQasVer, sPrdVer].filter(function (v) { return v !== "—"; });
+            const sVerMode = aVerVals.length ? aVerVals.slice().sort(function (a, b) {
+              return aVerVals.filter(function (v) { return v === b; }).length
+                   - aVerVals.filter(function (v) { return v === a; }).length;
+            })[0] : "";
+            const _verState = function (sVal, bExists) {
+              if (!bExists) return "Error";
+              if (sVal === sVerMode) return "None";
+              return "Warning";
+            };
+            aAllRows.push({
+              keyInfo:       sInfo,
+              field:         "Version",
+              devVal:        sDevVer,
+              qasVal:        sQasVer,
+              prdVal:        sPrdVer,
+              devState:      _verState(sDevVer, bHasDev),
+              qasState:      _verState(sQasVer, bHasQas),
+              prdState:      _verState(sPrdVer, bHasPrd),
+              _showKey:      true,
+              _syncText:     sSyncText,
+              _syncState:    sSyncState,
+              _rowHighlight: sRowHL,
+              _isDiff:       bRecordDiff,
+            });
+
+            // Build 1 row per diff field
             oSvc.diffFields.forEach(function (d, idx) {
               const sDevVal = bHasDev ? String(oMapDev[sKey][d.field] ?? "") : "—";
               const sQasVal = bHasQas ? String(oMapQas[sKey][d.field] ?? "") : "—";
@@ -1618,9 +1664,9 @@ sap.ui.define(
                 devState:     _state(sDevVal, bHasDev),
                 qasState:     _state(sQasVal, bHasQas),
                 prdState:     _state(sPrdVal, bHasPrd),
-                _showKey:     idx === 0,
-                _syncText:    sSyncText,
-                _syncState:   sSyncState,
+                _showKey:     false,
+                _syncText:    "",
+                _syncState:   "None",
                 _rowHighlight: sRowHL,
                 _isDiff:      bRecordDiff,
               });
