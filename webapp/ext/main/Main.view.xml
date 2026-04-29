@@ -295,7 +295,13 @@
                                                                ${vm>actionType} === 'PROMOTE'  ? 'Warning' : 'Success'}"
                                                     inverted="true"
                                                     class="itadmin-mod-pill"/>
-                                                <Text text="{vm>tableName}"
+                                                <ObjectStatus
+                                                    text="{vm>moduleId}"
+                                                    state="{= ${vm>moduleId} === 'FI' ? 'Warning' :
+                                                               ${vm>moduleId} === 'SD' ? 'Success' : 'Information'}"
+                                                    inverted="true"
+                                                    class="itadmin-mod-pill sapUiTinyMarginBegin"/>
+                                                <Text text="{= ${vm>rowCount} + ' record' + (${vm>rowCount} > 1 ? 's' : '')}"
                                                       class="itadmin-meta-txt sapUiTinyMarginBegin"/>
                                             </HBox>
                                             <HBox alignItems="Center">
@@ -344,6 +350,15 @@
                                 <Text text="{= ${detail>/by} ? 'by ' + ${detail>/by} : ''}"
                                       class="itadmin-meta-txt"/>
                             </HBox>
+                            <HBox alignItems="Start" class="sapUiTinyMarginTop"
+                                  visible="{= !!(${detail>/reason} &amp;&amp; ${detail>/reason} !== '-')}">
+                                <core:Icon src="sap-icon://hint"
+                                           color="#0a6ed1" size="0.8rem"
+                                           class="sapUiTinyMarginEnd itadmin-reason-icon"/>
+                                <Text text="{detail>/reason}"
+                                      wrapping="true"
+                                      class="itadmin-reason-text"/>
+                            </HBox>
                         </VBox>
                     </HBox>
 
@@ -362,15 +377,6 @@
                                            text="Preview">
                                 <content>
                                     <VBox class="itadmin-tab-content">
-                                        <Toolbar style="Clear" height="2.25rem"
-                                                 class="itadmin-preview-bar">
-                                            <ToolbarSpacer/>
-                                            <ToggleButton
-                                                text="Show Changes Only"
-                                                icon="sap-icon://filter"
-                                                pressed="{detail>/showChangedOnly}"
-                                                press=".onToggleChangedOnly"/>
-                                        </Toolbar>
                                         <VBox id="previewTableContainer"/>
                                     </VBox>
                                 </content>
@@ -382,89 +388,11 @@
                                            text="Journey">
                                 <content>
                                     <VBox class="itadmin-tab-content">
-                                        <!-- Rollback confirm -->
-                                        <Panel visible="{detail>/showRollbackConfirm}"
-                                               class="itadmin-rollback-panel">
-                                            <headerToolbar>
-                                                <Toolbar style="Clear" height="2.5rem">
-                                                    <core:Icon src="sap-icon://warning2"
-                                                               color="#E9730C" size="0.9rem"
-                                                               class="sapUiTinyMarginEnd"/>
-                                                    <Title text="{= 'Confirm Rollback — ' + ${detail>/rollbackTargetEnv}}"
-                                                           level="H5"/>
-                                                    <ToolbarSpacer/>
-                                                    <Button icon="sap-icon://decline"
-                                                            type="Transparent"
-                                                            press=".onRollbackCancel"/>
-                                                </Toolbar>
-                                            </headerToolbar>
-                                            <VBox class="sapUiSmallMargin">
-                                                <MessageStrip
-                                                    text="{= 'Data at ' + ${detail>/rollbackTargetEnv} + ' will revert to old values. This action cannot be undone!'}"
-                                                    type="Warning" showIcon="true"
-                                                    class="sapUiTinyMarginBottom"/>
-                                                <HBox class="sapUiSmallMarginTop">
-                                                    <Button text="Confirm Rollback"
-                                                            type="Reject"
-                                                            icon="sap-icon://undo"
-                                                            press=".onRollbackConfirm"/>
-                                                    <Button text="Cancel"
-                                                            press=".onRollbackCancel"
-                                                            class="sapUiSmallMarginBegin"/>
-                                                </HBox>
-                                            </VBox>
-                                        </Panel>
                                         <!-- Journey timeline (rendered by controller) -->
                                         <HBox id="journeyContainer"
                                               alignItems="Center"
                                               justifyContent="Center"
                                               class="itadmin-journey-box"/>
-                                    </VBox>
-                                </content>
-                            </IconTabFilter>
-
-                            <!-- Tab 3: Info — metadata (least urgent) -->
-                            <IconTabFilter key="INFO"
-                                           icon="sap-icon://hint"
-                                           text="Info">
-                                <content>
-                                    <VBox class="itadmin-tab-content itadmin-info-tab">
-                                        <HBox wrap="Wrap" alignItems="Start"
-                                              class="itadmin-info-fields">
-                                            <VBox class="itadmin-info-field">
-                                                <Label text="Module" design="Bold"/>
-                                                <ObjectStatus text="{detail>/module}"
-                                                    state="{= ${detail>/module} === 'FI' ? 'Information' :
-                                                               ${detail>/module} === 'SD' ? 'Success' : 'Warning'}"
-                                                    inverted="true"/>
-                                            </VBox>
-                                            <VBox class="itadmin-info-field">
-                                                <Label text="Current ENV" design="Bold"/>
-                                                <ObjectStatus text="{detail>/curEnv}"
-                                                    state="{= ${detail>/curEnv} === 'PRD' ? 'Success' :
-                                                               ${detail>/curEnv} === 'QAS' ? 'Warning' : 'Information'}"
-                                                    inverted="true"/>
-                                            </VBox>
-                                            <VBox class="itadmin-info-field">
-                                                <Label text="Requested By" design="Bold"/>
-                                                <HBox alignItems="Center">
-                                                    <core:Icon src="sap-icon://employee"
-                                                               color="#89919A" size="0.85rem"
-                                                               class="sapUiTinyMarginEnd"/>
-                                                    <Text text="{detail>/by}"/>
-                                                </HBox>
-                                            </VBox>
-                                            <VBox class="itadmin-info-field">
-                                                <Label text="Request ID" design="Bold"/>
-                                                <Text text="{detail>/reqId}"
-                                                      class="sapUiSmallText sapThemeNeutralText"/>
-                                            </VBox>
-                                            <VBox width="100%" class="itadmin-info-field">
-                                                <Label text="Reason" design="Bold"/>
-                                                <Text text="{= ${detail>/reason} &amp;&amp; ${detail>/reason} !== '-' ? ${detail>/reason} : '(no reason)'}"
-                                                      wrapping="true"/>
-                                            </VBox>
-                                        </HBox>
                                     </VBox>
                                 </content>
                             </IconTabFilter>

@@ -159,7 +159,6 @@ sap.ui.define(
             reqId: "", module: "", confName: "", by: "", reason: "",
             curEnv: "", nextEnv: "",
             isPromoteMode: false, promoteEnabled: false,
-            showRollbackConfirm: false, rollbackTargetEnv: "",
             lines: [], linesDisplay: [], journey: [],
             showChangedOnly: false,
             activeTab: "PREVIEW",
@@ -489,16 +488,16 @@ sap.ui.define(
         const oView = this.getView();
         oView.setBusy(true);
         try {
-          // Step 1: Lấy ReqTitle từ ZC_CONF_REQ_H để join vào log entries
+          // Step 1: Lấy ReqTitle + Reason từ ZC_CONF_REQ_H để join vào log entries
           const oReqTitleMap = {};
           try {
             const oHdrResp = await fetch(
-              _BASE_URL + "ZC_CONF_REQ_H?$select=ReqId,ReqTitle&$top=5000",
+              _BASE_URL + "ZC_CONF_REQ_H?$select=ReqId,ReqTitle,Reason&$top=5000",
               { headers: _FETCH_HDR }
             );
             if (oHdrResp.ok) {
               ((await oHdrResp.json()).value || []).forEach(function (h) {
-                if (h.ReqId) oReqTitleMap[h.ReqId] = h.ReqTitle || "-";
+                if (h.ReqId) oReqTitleMap[h.ReqId] = { title: h.ReqTitle || "-", reason: h.Reason || "" };
               });
             }
           } catch (e) { console.warn("Header title fetch failed", e); }
@@ -509,22 +508,59 @@ sap.ui.define(
           if (!oAuditResp.ok) throw new Error("AuditLog fetch failed");
           const aLogs = (await oAuditResp.json()).value || [];
 
-          // Step 3: Map sang display model
-          const aAudit = aLogs.map(function (log) {
-            return {
-              logId:      log.LogId      || "-",
-              reqId:      log.ReqId      || "-",
-              moduleId:   log.ModuleId   || "?",
-              actionType: log.ActionType || "-",
-              envId:      log.EnvId      || "-",
-              changedBy:  log.ChangedBy  || "-",
-              changedAt:  _formatDate(log.ChangedAt),
-              tableName:  log.TableName  || "-",
-              oldData:    log.OldData    || "",
-              newData:    log.NewData    || "",
-              objectKey:  log.ObjectKey  || "-",
-              reqTitle:   oReqTitleMap[log.ReqId] || "-",
-            };
+          // Step 3: Group log entries by reqId + opType + envId + minute
+          // opType buckets PROMOTE/ROLLBACK as their own operation — prevents them
+          // from merging with each other or with APPROVE items even within the same minute.
+          const oGroups = {};
+          aLogs.forEach(function (log) {
+            const sMinute = (log.ChangedAt || "").substring(0, 16); // "2026-04-21T10:30"
+            const sOp = (log.ActionType === "ROLLBACK") ? "ROLLBACK"
+                      : (log.ActionType === "PROMOTE")  ? "PROMOTE"
+                      : "APPROVE";
+            const sKey = (log.ReqId || "") + "|" + sOp + "|" + (log.EnvId || "") + "|" + sMinute;
+            const oHdr = oReqTitleMap[log.ReqId] || {};
+
+            if (!oGroups[sKey]) {
+              oGroups[sKey] = {
+                groupKey:     sKey,
+                reqId:        log.ReqId     || "-",
+                moduleId:     log.ModuleId  || "?",
+                actionType:   sOp,
+                envId:        log.EnvId     || "-",
+                changedBy:    log.ChangedBy || "-",
+                changedAt:    _formatDate(log.ChangedAt),
+                changedAtRaw: log.ChangedAt || "",
+                reqTitle:     oHdr.title    || "-",
+                reqReason:    oHdr.reason   || "",
+                rowCount:     0,
+                _rows:        [],
+              };
+            }
+
+            oGroups[sKey].rowCount++;
+            oGroups[sKey]._rows.push({
+              logId:      log.LogId     || "-",
+              tableName:  log.TableName || "-",
+              objectKey:  log.ObjectKey || "-",
+              oldData:    log.OldData   || "",
+              newData:    log.NewData   || "",
+              itemAction: (function () {
+                var at  = log.ActionType || "";
+                var old = (log.OldData || "").trim();
+                var nw  = (log.NewData || "").trim();
+                if (at === "PROMOTE" || at === "ROLLBACK") {
+                  if (!old || old === "{}") return "CREATE";
+                  if (!nw  || nw  === "{}") return "DELETE";
+                  return "UPDATE";
+                }
+                return at || "-";
+              }()),
+            });
+          });
+
+          // Chuyển object → array, sort mới nhất lên đầu
+          const aAudit = Object.values(oGroups).sort(function (a, b) {
+            return (b.changedAtRaw > a.changedAtRaw) ? 1 : -1;
           });
 
           this.getView().getModel("vm").setProperty("/auditEntries", aAudit);
@@ -585,49 +621,66 @@ sap.ui.define(
 
       _openAuditDiffForItem: async function (oItem) {
 
-        // Parse JSON → mảng {field, value, changed}
-        var _parseFields = function (sJson) {
-          if (!sJson) return [];
-          try {
-            var oData = JSON.parse(sJson);
-            return Object.keys(oData).map(function (k) {
-              return { field: k, value: oData[k] != null ? String(oData[k]) : "", changed: false };
-            });
-          } catch (e) {
-            return [{ field: "raw", value: sJson, changed: false }];
-          }
-        };
+        // oItem là 1 group — _rows chứa tất cả config rows của action đó
+        const aRows = oItem._rows || [];
 
-        var aOld = _parseFields(oItem.oldData);
-        var aNew = _parseFields(oItem.newData);
+        // Parse tất cả rows thành danh sách diff entries để hiện trong dialog
+        // Lọc ZCONFREQH: chỉ dùng cho workflow tracking, không phải config data
+        const aDiffEntries = aRows.filter(function (oRow) {
+          return oRow.tableName !== "ZCONFREQH";
+        }).map(function (oRow) {
+          var _parseFields = function (sJson) {
+            if (!sJson) return [];
+            try {
+              var oData = JSON.parse(sJson);
+              return Object.keys(oData).map(function (k) {
+                return { field: k, value: oData[k] != null ? String(oData[k]) : "" };
+              });
+            } catch (e) {
+              return [{ field: "raw", value: sJson }];
+            }
+          };
 
-        // Đánh dấu field nào thay đổi giữa old và new
-        var oOldMap = {};
-        aOld.forEach(function (r) { oOldMap[r.field] = r.value; });
-        aNew.forEach(function (r) { r.changed = (oOldMap[r.field] !== r.value); });
-        var oNewMap = {};
-        aNew.forEach(function (r) { oNewMap[r.field] = r.value; });
-        aOld.forEach(function (r) { r.changed = (oNewMap[r.field] !== r.value); });
+          var aOld = _parseFields(oRow.oldData);
+          var aNew = _parseFields(oRow.newData);
 
-        // Nếu new không có field → thêm placeholder để căn hàng
-        var aNewFields = Object.keys(oNewMap);
-        aOld.forEach(function (r) {
-          if (!aNewFields.includes(r.field)) {
-            aNew.push({ field: r.field, value: "", changed: true });
-          }
+          // Đánh dấu field thay đổi
+          var oOldMap = {};
+          aOld.forEach(function (r) { oOldMap[r.field] = r.value; });
+          aNew.forEach(function (r) { r.changed = (oOldMap[r.field] !== r.value); });
+          var oNewMap = {};
+          aNew.forEach(function (r) { oNewMap[r.field] = r.value; });
+          aOld.forEach(function (r) { r.changed = (oNewMap[r.field] !== r.value); });
+
+          // Thêm placeholder cho field chỉ có ở old
+          Object.keys(oOldMap).forEach(function (k) {
+            if (!oNewMap.hasOwnProperty(k)) {
+              aNew.push({ field: k, value: "", changed: true });
+            }
+          });
+
+          return {
+            tableName:  oRow.tableName  || "-",
+            objectKey:  oRow.objectKey  || "-",
+            itemAction: oRow.itemAction || "-",
+            oldFields:  aOld,
+            newFields:  aNew,
+            hasChanges: aNew.some(function (f) { return f.changed; }) ||
+                        aOld.some(function (f) { return f.changed; }),
+          };
         });
 
         const oDiffModel = new JSONModel({
-          title:      "Diff · " + (oItem.tableName || "-"),
+          title:      (oItem.actionType || "-") + " · " + (oItem.reqTitle || "-"),
           actionType: oItem.actionType || "-",
           moduleId:   oItem.moduleId   || "-",
           envId:      oItem.envId      || "-",
-          tableName:  oItem.tableName  || "-",
           changedBy:  oItem.changedBy  || "-",
           changedAt:  oItem.changedAt  || "-",
           reqTitle:   oItem.reqTitle   || "-",
-          oldFields:  aOld,
-          newFields:  aNew,
+          reqReason:  oItem.reqReason  || "",
+          rowCount:   aDiffEntries.length,
+          entries:    aDiffEntries,
         });
 
         if (!this._oAuditDiffDialog) {
@@ -674,7 +727,11 @@ sap.ui.define(
         if (!oLI || !oLI.getBindingContext) return;
         const oCtx = oLI.getBindingContext("vm");
         if (!oCtx) return;
-        this._openAuditDiffForItem(oCtx.getObject());
+        const oItem = oCtx.getObject();
+        // Bỏ selection ngay để lần click tiếp theo vào cùng item vẫn fire event
+        const oList = this.byId("auditList");
+        if (oList) oList.removeSelections(true);
+        this._openAuditDiffForItem(oItem);
       },
 
       // ─── Detail back (close mid column) ──────────────────────────────────────
@@ -728,8 +785,6 @@ sap.ui.define(
           nextEnv:  sNextEnv,
           isPromoteMode:       !!bIsPromote,
           promoteEnabled:      false,
-          showRollbackConfirm: !!bAutoRollback,
-          rollbackTargetEnv:   bAutoRollback ? sCurEnv : "",
           lines: [], linesDisplay: [], journey: [],
           showChangedOnly: false,
           devNode: { exists: false, current: false, label: "", by: "", at: "", status: "", statusState: "None" },
@@ -1022,16 +1077,6 @@ sap.ui.define(
         this.getView().getModel("detail").setProperty("/previewTab", sKey);
       },
 
-      onToggleChangedOnly: function (oEvent) {
-        const bPressed = oEvent.getSource().getPressed();
-        const oModel   = this.getView().getModel("detail");
-        const aAll     = oModel.getProperty("/lines");
-        oModel.setProperty("/showChangedOnly", bPressed);
-        const aFiltered = bPressed ? aAll.filter(function (l) { return l.changed; }) : aAll;
-        oModel.setProperty("/linesDisplay", aFiltered);
-        this._buildPreviewTable(aFiltered);
-      },
-
       // ─── Build Promote Journey UI (render bằng HTML trực tiếp) ──────────────
 
       _buildJourneyUI: function (oNodes) {
@@ -1141,9 +1186,17 @@ sap.ui.define(
         oContainer.destroyItems();
 
         const oSvc = this._oCurrentSvc;
+        const bChangedOnly = this.getView().getModel("detail").getProperty("/showChangedOnly");
+
         if (!oSvc || !aRows || !aRows.length) {
-          const sap_m = sap.m || sap.ui.require("sap/m/Text");
-          oContainer.addItem(new sap.m.Text({ text: "No data." }));
+          const sMsg = bChangedOnly
+            ? "No changed rows — all records are identical to the current configuration."
+            : "No data.";
+          oContainer.addItem(new sap.m.MessageStrip({
+            text: sMsg,
+            type: bChangedOnly ? "Information" : "None",
+            showIcon: bChangedOnly,
+          }));
           return;
         }
 
@@ -1207,10 +1260,9 @@ sap.ui.define(
             if (oRow.rowType === "MODIFIED" && oKF.changed) {
               const oBox = new sap.m.HBox({ alignItems: "Center" });
               oBox.addItem(new sap.m.ObjectStatus({ text: oKF.oldVal || "(empty)", state: "Error" }));
-              oBox.addItem(new sap.ui.core.Icon({
-                src: "sap-icon://navigation-right-arrow",
-                color: "#E9730C", size: "0.75rem", style: "margin: 0 0.25rem",
-              }));
+              const oArrow1 = new sap.ui.core.Icon({ src: "sap-icon://navigation-right-arrow", color: "#E9730C", size: "0.75rem" });
+              oArrow1.addStyleClass("sapUiTinyMarginBeginEnd");
+              oBox.addItem(oArrow1);
               oBox.addItem(new sap.m.ObjectStatus({ text: oKF.newVal || "(empty)", state: "Success" }));
               oCLI.addCell(oBox);
             } else {
@@ -1234,19 +1286,11 @@ sap.ui.define(
             } else if (oRow.rowType === "MODIFIED" && oField.changed) {
               // Field thực sự thay đổi → hiện old → new
               const oBox = new sap.m.HBox({ alignItems: "Center" });
-              oBox.addItem(new sap.m.ObjectStatus({
-                text: oField.oldVal || "(empty)",
-                state: "Error",
-              }));
-              oBox.addItem(new sap.ui.core.Icon({
-                src: "sap-icon://navigation-right-arrow",
-                color: "#E9730C", size: "0.75rem",
-                style: "margin: 0 0.25rem",
-              }));
-              oBox.addItem(new sap.m.ObjectStatus({
-                text: oField.newVal || "(empty)",
-                state: "Success",
-              }));
+              oBox.addItem(new sap.m.ObjectStatus({ text: oField.oldVal || "(empty)", state: "Error" }));
+              const oArrow2 = new sap.ui.core.Icon({ src: "sap-icon://navigation-right-arrow", color: "#E9730C", size: "0.75rem" });
+              oArrow2.addStyleClass("sapUiTinyMarginBeginEnd");
+              oBox.addItem(oArrow2);
+              oBox.addItem(new sap.m.ObjectStatus({ text: oField.newVal || "(empty)", state: "Success" }));
               oCLI.addCell(oBox);
             } else {
               oCLI.addCell(new sap.m.Text({
@@ -1299,9 +1343,7 @@ sap.ui.define(
           return;
         }
 
-        // Mở dialog với confirm panel đã sẵn sàng (bAutoRollback = true)
-        const bIsPromote = oItem.EnvId !== "PRD";
-        await this._openDetailPanel(oItem, bIsPromote, true);
+        this._showRollbackConfirm(oItem.ReqId, oItem.EnvId);
       },
 
       // ─── Dialog: Rollback node button — hiện confirm panel inline ────────────
@@ -1326,51 +1368,66 @@ sap.ui.define(
           return;
         }
 
-        const oModel = this.getView().getModel("detail");
-        oModel.setProperty("/rollbackTargetEnv",   sEnv);
-        oModel.setProperty("/showRollbackConfirm", true);
+        this._showRollbackConfirm(sReqId, sEnv);
       },
 
-      // ─── Dialog: Xác nhận rollback (từ inline confirm panel) ─────────────────
+      // ─── Rollback confirmation dialog ─────────────────────────────────────────
 
-      onRollbackConfirm: async function () {
-        const oModel = this.getView().getModel("detail");
-        const sEnvId = oModel.getProperty("/rollbackTargetEnv");
-        const sReqId = this._oCurrentItem.ReqId;
+      _showRollbackConfirm: function (sReqId, sEnvId) {
+        const fnClose = function (oDialog) { oDialog.close(); oDialog.destroy(); };
 
-        oModel.setProperty("/showRollbackConfirm", false);
-        this.onDetailBack();
+        const oDialog = new sap.m.Dialog({
+          title: "Confirm Rollback — " + sEnvId,
+          type:  "Message",
+          state: "Warning",
+          content: [
+            new sap.m.Text({
+              text: "Data at " + sEnvId + " will revert to old values.\nThis action cannot be undone!",
+              wrapping: true,
+            }),
+          ],
+          buttons: [
+            new sap.m.Button({
+              text: "Cancel",
+              type: "Default",
+              press: function () { fnClose(oDialog); },
+            }),
+            new sap.m.Button({
+              text: "Rollback",
+              type: "Reject",
+              icon: "sap-icon://undo",
+              press: async () => {
+                fnClose(oDialog);
+                this.onDetailBack();
+                const oView = this.getView();
+                oView.setBusy(true);
+                try {
+                  await this._execBoundAction(sReqId, sEnvId, "rollback");
+                  this._sendMailNotification({
+                    event: "ROLLED_BACK",
+                    reqId: sReqId,
+                    reqTitle: (this._oCurrentItem && this._oCurrentItem.ReqTitle) || sReqId,
+                    module:   (this._oCurrentItem && this._oCurrentItem.ModuleId) || "",
+                    envId:    sEnvId,
+                    triggeredBy: this._getCurrentUser(),
+                  });
+                  this._aCachedAll = null;
+                  this._loadRequests();
+                  this._loadAuditTrail();
+                  MessageBox.success("Rollback successful — ENV: " + sEnvId + ".");
+                } catch (e) {
+                  console.error(e);
+                  MessageBox.error("Rollback failed: " + (e.message || e));
+                } finally {
+                  oView.setBusy(false);
+                }
+              },
+            }),
+          ],
+        });
 
-        const oView = this.getView();
-        oView.setBusy(true);
-        try {
-          await this._execBoundAction(sReqId, sEnvId, "rollback");
-
-          // === Email notification (fire-and-forget) ===
-          this._sendMailNotification({
-            event: "ROLLED_BACK",
-            reqId: sReqId,
-            reqTitle: this._oCurrentItem.ReqTitle || sReqId,
-            module: this._oCurrentItem.ModuleId || "",
-            envId: sEnvId,
-            triggeredBy: this._getCurrentUser()
-          });
-
-          this._aCachedAll = null;
-          this._loadRequests();
-          MessageBox.success("Rollback successful — ENV: " + sEnvId + ".");
-        } catch (e) {
-          console.error(e);
-          MessageBox.error("Rollback failed: " + (e.message || e));
-        } finally {
-          oView.setBusy(false);
-        }
-      },
-
-      // ─── Dialog: Hủy rollback ─────────────────────────────────────────────────
-
-      onRollbackCancel: function () {
-        this.getView().getModel("detail").setProperty("/showRollbackConfirm", false);
+        this.getView().addDependent(oDialog);
+        oDialog.open();
       },
 
       // ─── Dialog: Rollback ─────────────────────────────────────────────────────
@@ -1422,6 +1479,8 @@ sap.ui.define(
 
                 this._aCachedAll = null;
                 this._loadRequests();
+                // Reload audit trail để hiện snapshot rollback mới ngay lập tức
+                this._loadAuditTrail();
                 MessageBox.success("Rollback successful — ENV: " + sEnvId + ".");
               } catch (e) {
                 console.error(e);
@@ -1446,10 +1505,12 @@ sap.ui.define(
           return;
         }
 
+        const sTitle = oItem.ReqTitle || oItem.ReqId;
+
         MessageBox.confirm(
           "Promote " + sCurEnv + " → " + sNextEnv + "?\n" +
-          "REQ_ID: " + oItem.ReqId + "\n\n" +
-          "Config lines will be copied to " + sNextEnv + " with the new EnvId.",
+          sTitle + "\n\n" +
+          "Config lines will be copied to " + sNextEnv + ".",
           {
             actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
             emphasizedAction: MessageBox.Action.OK,
@@ -1465,7 +1526,7 @@ sap.ui.define(
                 this._sendMailNotification({
                   event: "PROMOTED",
                   reqId: oItem.ReqId,
-                  reqTitle: oItem.ReqTitle || oItem.ReqId,
+                  reqTitle: sTitle,
                   module: oItem.ModuleId || "",
                   envId: sNextEnv,
                   triggeredBy: this._getCurrentUser()
@@ -1473,6 +1534,8 @@ sap.ui.define(
 
                 this._aCachedAll = null;
                 this._loadRequests();
+                // Reload audit trail để hiện snapshot mới ngay lập tức
+                this._loadAuditTrail();
                 MessageBox.success("Promote successful to " + sNextEnv + ".");
               } catch (e) {
                 console.error(e);

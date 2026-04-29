@@ -4,16 +4,18 @@
     xmlns:l="sap.ui.layout">
 
     <Dialog id="auditDiffDialog"
-            title="{diff>/title}"
-            contentWidth="52rem" contentHeight="auto"
-            verticalScrolling="true" draggable="true" resizable="true">
+            title="{= ${diff>/actionType} + ' · ' + ${diff>/moduleId} + ' — ' + ${diff>/envId}}"
+            contentWidth="56rem"
+            contentHeight="auto"
+            verticalScrolling="true"
+            draggable="true"
+            resizable="true">
 
         <content>
             <VBox class="sapUiSmallMargin">
 
                 <!-- ── Context badges ──────────────────────────────────── -->
                 <HBox wrap="Wrap" alignItems="Center" class="sapUiTinyMarginBottom">
-
                     <ObjectStatus
                         text="{= ${diff>/actionType} === 'APPROVE'  ? 'Approve'  :
                                   ${diff>/actionType} === 'PROMOTE'  ? 'Promote'  :
@@ -21,105 +23,136 @@
                         state="{= ${diff>/actionType} === 'APPROVE'  ? 'Success' :
                                   ${diff>/actionType} === 'PROMOTE'  ? 'Warning' :
                                   ${diff>/actionType} === 'ROLLBACK' ? 'Error'   : 'None'}"
-                        inverted="true"
-                        class="sapUiSmallMarginEnd"/>
-
+                        inverted="true" class="sapUiSmallMarginEnd"/>
                     <ObjectStatus
                         text="{diff>/moduleId}"
                         state="{= ${diff>/moduleId} === 'FI' ? 'Warning' :
                                    ${diff>/moduleId} === 'SD' ? 'Success' : 'Information'}"
-                        inverted="true"
-                        class="sapUiSmallMarginEnd"/>
-
+                        inverted="true" class="sapUiSmallMarginEnd"/>
                     <ObjectStatus
                         text="{diff>/envId}"
                         state="{= ${diff>/envId} === 'PRD' ? 'Success' :
                                    ${diff>/envId} === 'QAS' ? 'Warning' : 'Information'}"
-                        inverted="true"
-                        class="sapUiSmallMarginEnd"/>
-
-                    <core:Icon src="sap-icon://database" size="0.85rem"
-                               color="#89919A" class="sapUiTinyMarginEnd"/>
-                    <Text text="{diff>/tableName}" class="sapUiSmallText sapUiSmallMarginEnd"/>
-
+                        inverted="true" class="sapUiSmallMarginEnd"/>
                     <core:Icon src="sap-icon://employee" size="0.85rem"
                                color="#89919A" class="sapUiTinyMarginEnd"/>
                     <Text text="{diff>/changedBy}" class="sapUiSmallText sapUiSmallMarginEnd"/>
-
                     <core:Icon src="sap-icon://appointment" size="0.85rem"
                                color="#89919A" class="sapUiTinyMarginEnd"/>
-                    <Text text="{diff>/changedAt}" class="sapUiSmallText"/>
-
+                    <Text text="{diff>/changedAt}" class="sapUiSmallText sapUiSmallMarginEnd"/>
+                    <Text text="{= '(' + ${diff>/rowCount} + ' record' + (${diff>/rowCount} > 1 ? 's' : '') + ')'}"
+                          class="sapUiSmallText sapThemeNeutralText"/>
                 </HBox>
 
-                <Text text="{diff>/reqTitle}"
-                      class="sapUiBoldText sapUiTinyMarginBottom"
-                      wrapping="false" maxLines="1"/>
+                <Title text="{diff>/reqTitle}" level="H5" class="sapUiTinyMarginBottom"/>
+                <MessageStrip
+                    text="{= 'Reason: ' + ${diff>/reqReason}}"
+                    visible="{= !!${diff>/reqReason}}"
+                    type="Information"
+                    showIcon="true"
+                    showCloseButton="false"
+                    class="sapUiSmallMarginBottom"/>
 
-                <!-- ── Diff columns ────────────────────────────────────── -->
-                <l:Grid defaultSpan="L6 M6 S12" class="sapUiTinyMarginTop">
-                    <l:content>
+                <!-- ── One panel per config row ────────────────────────── -->
+                <List items="{diff>/entries}"
+                      showSeparators="None"
+                      noDataText="No diff data.">
+                    <items>
+                        <CustomListItem>
+                            <VBox class="sapUiTinyMarginBottom">
 
-                        <!-- OLD -->
-                        <Panel class="sapUiTinyMarginEnd">
-                            <headerToolbar>
-                                <Toolbar style="Clear" height="2rem">
-                                    <core:Icon src="sap-icon://decline"
-                                               color="#BB0000" size="0.9rem"
+                                <!-- Row header: table name + item-level action badge -->
+                                <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                                    <core:Icon src="sap-icon://database"
+                                               size="0.8rem" color="#89919A"
                                                class="sapUiTinyMarginEnd"/>
-                                    <Title text="Old Value" level="H5"/>
-                                </Toolbar>
-                            </headerToolbar>
-                            <Table items="{diff>/oldFields}"
-                                   showSeparators="Inner"
-                                   noDataText="(no data)">
-                                <columns>
-                                    <Column width="10rem"><Text text="Field"/></Column>
-                                    <Column><Text text="Value"/></Column>
-                                </columns>
-                                <items>
-                                    <ColumnListItem highlight="{= ${diff>changed} ? 'Error' : 'None'}">
-                                        <cells>
-                                            <Text text="{diff>field}" class="sapUiSmallText sapThemeNeutralText"/>
-                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(empty)'}"
-                                                  class="{= ${diff>changed} ? 'sapThemeNegativeText' : ''}"/>
-                                        </cells>
-                                    </ColumnListItem>
-                                </items>
-                            </Table>
-                        </Panel>
+                                    <Text text="{diff>tableName}"
+                                          class="sapUiSmallText sapThemeNeutralText sapUiSmallMarginEnd"/>
+                                    <ObjectStatus
+                                        text="{= ${diff>itemAction} === 'CREATE'   ? 'Create'   :
+                                                  ${diff>itemAction} === 'UPDATE'   ? 'Update'   :
+                                                  ${diff>itemAction} === 'DELETE'   ? 'Delete'   :
+                                                  ${diff>itemAction} === 'PROMOTE'  ? 'Promote'  :
+                                                  ${diff>itemAction} === 'ROLLBACK' ? 'Rollback' : ${diff>itemAction}}"
+                                        state="{= ${diff>itemAction} === 'CREATE'   ? 'Success' :
+                                                  ${diff>itemAction} === 'UPDATE'   ? 'Warning' :
+                                                  ${diff>itemAction} === 'DELETE'   ? 'Error'   :
+                                                  ${diff>itemAction} === 'PROMOTE'  ? 'Warning' :
+                                                  ${diff>itemAction} === 'ROLLBACK' ? 'Error'   : 'None'}"
+                                        inverted="true"/>
+                                </HBox>
 
-                        <!-- NEW -->
-                        <Panel>
-                            <headerToolbar>
-                                <Toolbar style="Clear" height="2rem">
-                                    <core:Icon src="sap-icon://accept"
-                                               color="#107E3E" size="0.9rem"
-                                               class="sapUiTinyMarginEnd"/>
-                                    <Title text="New Value" level="H5"/>
-                                </Toolbar>
-                            </headerToolbar>
-                            <Table items="{diff>/newFields}"
-                                   showSeparators="Inner"
-                                   noDataText="(no data)">
-                                <columns>
-                                    <Column width="10rem"><Text text="Field"/></Column>
-                                    <Column><Text text="Value"/></Column>
-                                </columns>
-                                <items>
-                                    <ColumnListItem highlight="{= ${diff>changed} ? 'Success' : 'None'}">
-                                        <cells>
-                                            <Text text="{diff>field}" class="sapUiSmallText sapThemeNeutralText"/>
-                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(empty)'}"
-                                                  class="{= ${diff>changed} ? 'sapThemePositiveText' : ''}"/>
-                                        </cells>
-                                    </ColumnListItem>
-                                </items>
-                            </Table>
-                        </Panel>
+                                <!-- Diff columns: Old | New -->
+                                <l:Grid defaultSpan="L6 M6 S12">
+                                    <l:content>
 
-                    </l:content>
-                </l:Grid>
+                                        <!-- OLD -->
+                                        <Panel class="sapUiTinyMarginEnd">
+                                            <headerToolbar>
+                                                <Toolbar style="Clear" height="2rem">
+                                                    <core:Icon src="sap-icon://decline"
+                                                               color="#BB0000" size="0.85rem"
+                                                               class="sapUiTinyMarginEnd"/>
+                                                    <Title text="Before" level="H6"/>
+                                                </Toolbar>
+                                            </headerToolbar>
+                                            <Table items="{diff>oldFields}"
+                                                   showSeparators="Inner"
+                                                   noDataText="{= ${diff>itemAction} === 'CREATE' ? 'Record did not exist' : '(no data)'}">
+                                                <columns>
+                                                    <Column width="9rem"><Text text="Field"/></Column>
+                                                    <Column><Text text="Value"/></Column>
+                                                </columns>
+                                                <items>
+                                                    <ColumnListItem highlight="{= ${diff>changed} ? 'Error' : 'None'}">
+                                                        <cells>
+                                                            <Text text="{diff>field}"
+                                                                  class="sapUiSmallText sapThemeNeutralText"/>
+                                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(empty)'}"
+                                                                  class="{= ${diff>changed} ? 'sapThemeNegativeText' : ''}"/>
+                                                        </cells>
+                                                    </ColumnListItem>
+                                                </items>
+                                            </Table>
+                                        </Panel>
+
+                                        <!-- NEW -->
+                                        <Panel>
+                                            <headerToolbar>
+                                                <Toolbar style="Clear" height="2rem">
+                                                    <core:Icon src="sap-icon://accept"
+                                                               color="#107E3E" size="0.85rem"
+                                                               class="sapUiTinyMarginEnd"/>
+                                                    <Title text="After" level="H6"/>
+                                                </Toolbar>
+                                            </headerToolbar>
+                                            <Table items="{diff>newFields}"
+                                                   showSeparators="Inner"
+                                                   noDataText="{= ${diff>itemAction} === 'DELETE' ? 'Record was deleted' : '(no data)'}">
+                                                <columns>
+                                                    <Column width="9rem"><Text text="Field"/></Column>
+                                                    <Column><Text text="Value"/></Column>
+                                                </columns>
+                                                <items>
+                                                    <ColumnListItem highlight="{= ${diff>changed} ? 'Success' : 'None'}">
+                                                        <cells>
+                                                            <Text text="{diff>field}"
+                                                                  class="sapUiSmallText sapThemeNeutralText"/>
+                                                            <Text text="{= ${diff>value} !== '' ? ${diff>value} : '(empty)'}"
+                                                                  class="{= ${diff>changed} ? 'sapThemePositiveText' : ''}"/>
+                                                        </cells>
+                                                    </ColumnListItem>
+                                                </items>
+                                            </Table>
+                                        </Panel>
+
+                                    </l:content>
+                                </l:Grid>
+
+                            </VBox>
+                        </CustomListItem>
+                    </items>
+                </List>
 
             </VBox>
         </content>

@@ -664,3 +664,19 @@
     box-shadow: none !important;
     background: transparent !important;
 }
+
+
+/* ───────────────────────────────────────────────────────────────────
+   19. REASON row in detail header
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-reason-icon {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.itadmin-reason-text {
+    color: #0a6ed1 !important;
+    font-size: 0.75rem !important;
+    font-style: italic;
+}
