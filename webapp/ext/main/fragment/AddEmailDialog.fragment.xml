@@ -1,0 +1,37 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form">
+    
+    <Dialog
+        title="{emailForm>/title}"
+        contentWidth="28rem">
+        
+        <content>
+            <f:SimpleForm
+                editable="true"
+                layout="ResponsiveGridLayout"
+                labelSpanXL="4" labelSpanL="4" labelSpanM="4" labelSpanS="12"
+                emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0"
+                columnsXL="1" columnsL="1" columnsM="1">
+                
+                <f:content>
+                    <Label text="User ID" required="true"/>
+                    <Text text="{emailForm>/UserId}"/>
+                    
+                    <Label text="Email" required="true"/>
+                    <Input
+                        value="{emailForm>/Email}"
+                        type="Email"
+                        placeholder="user@example.com"/>
+                </f:content>
+            </f:SimpleForm>
+        </content>
+        
+        <buttons>
+            <Button text="Cancel" press=".onCancelAddEmail"/>
+            <Button text="Save" type="Emphasized" press=".onSaveEmailToUser"/>
+        </buttons>
+    </Dialog>
+    
+</core:FragmentDefinition>

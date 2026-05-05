@@ -20,55 +20,67 @@
                   class="itadmin-master-page">
                 <content>
 
-                    <!-- ① Sticky Master Header ─────────────────── -->
-                    <HBox justifyContent="SpaceBetween" alignItems="Center"
-                          class="itadmin-master-hdr">
-                        <VBox justifyContent="Center">
-                            <Title text="IT Admin Console" level="H4"
-                                   class="itadmin-master-title"/>
-                            <Text text="Promote, rollback and audit configuration changes across environments"
-                                  class="itadmin-master-subtitle sapUiTinyMarginTop"/>
-                            <HBox alignItems="Center" class="itadmin-kpi-row">
-                                <ObjectStatus text="{kpi>/atDev} DEV"
-                                              state="Warning"
-                                              class="sapUiTinyMarginEnd"
-                                              visible="{= ${kpi>/atDev} > 0}"/>
-                                <ObjectStatus text="{kpi>/atQas} QAS"
-                                              state="Information"
-                                              class="sapUiTinyMarginEnd"
-                                              visible="{= ${kpi>/atQas} > 0}"/>
-                                <ObjectStatus text="{kpi>/atPrd} PRD"
-                                              state="Success"
-                                              class="sapUiTinyMarginEnd"
-                                              visible="{= ${kpi>/atPrd} > 0}"/>
-                                <Text text="{= ${kpi>/total} + ' requests'}"
-                                      class="itadmin-kpi-total"
-                                      visible="{= ${kpi>/total} > 0}"/>
-                            </HBox>
-                        </VBox>
-                        <HBox alignItems="Center">
-                            <Button icon="sap-icon://compare"
-                                    type="Transparent"
-                                    tooltip="Compare Environments"
-                                    press=".onEnvCompareOpen"/>
-                            <HBox id="notifBellWrapper"
-                                  alignItems="Center"
-                                  class="itNotifBellWrapper">
-                                <Button id="notifBell"
-                                        icon="sap-icon://bell"
-                                        type="Transparent"
-                                        tooltip="Notifications"
-                                        press=".onNotifBellPress"/>
-                                <Text id="notifBadgeText"
-                                      text="{= ${notif>/unreadCount} > 99 ? '99+' : String(${notif>/unreadCount})}"
-                                      visible="{= ${notif>/unreadCount} > 0}"
-                                      class="itNotifBadge"/>
+                    <!-- ① Sticky Master Header -->
+                    <VBox class="itadmin-master-hdr">
+                        <!-- Row 1: Title + Actions -->
+                        <HBox alignItems="Center" justifyContent="SpaceBetween">
+                            <!-- Left: title + KPI -->
+                            <VBox justifyContent="Center" class="itadmin-hdr-left">
+                                <Title text="IT Admin Console" level="H4"
+                                       class="itadmin-master-title"/>
+                                <HBox alignItems="Center" class="itadmin-kpi-row">
+                                    <ObjectStatus text="{kpi>/atDev} DEV"
+                                                  state="Warning"
+                                                  class="sapUiTinyMarginEnd"
+                                                  visible="{= ${kpi>/atDev} > 0}"/>
+                                    <ObjectStatus text="{kpi>/atQas} QAS"
+                                                  state="Information"
+                                                  class="sapUiTinyMarginEnd"
+                                                  visible="{= ${kpi>/atQas} > 0}"/>
+                                    <ObjectStatus text="{kpi>/atPrd} PRD"
+                                                  state="Success"
+                                                  class="sapUiTinyMarginEnd"
+                                                  visible="{= ${kpi>/atPrd} > 0}"/>
+                                    <Text text="{= ${kpi>/total} + ' requests'}"
+                                          class="itadmin-kpi-total"
+                                          visible="{= ${kpi>/total} > 0}"/>
+                                </HBox>
+                            </VBox>
+
+                            <!-- Right: action buttons -->
+                            <HBox alignItems="Center" justifyContent="End" class="itadmin-hdr-right">
+                                <HBox id="notifBellWrapper"
+                                      alignItems="Center"
+                                      class="itNotifBellWrapper">
+                                    <Button id="notifBell"
+                                            icon="sap-icon://bell"
+                                            type="Transparent"
+                                            tooltip="Notifications"
+                                            press=".onNotifBellPress"/>
+                                    <Text id="notifBadgeText"
+                                          text="{= ${notif>/unreadCount} > 99 ? '99+' : String(${notif>/unreadCount})}"
+                                          visible="{= ${notif>/unreadCount} > 0}"
+                                          class="itNotifBadge"/>
+                                </HBox>
                             </HBox>
                         </HBox>
-                    </HBox>
 
-                    <!-- ② Module Tabs ───────────────────────────── -->
+                        <!-- Row 2: Section Navigation -->
+                        <HBox justifyContent="Center" alignItems="Center" class="sapUiSmallMarginTop">
+                            <SegmentedButton id="sectionSwitch"
+                                             selectedKey="{= ${vm>/userMgmtMode} ? 'USERS' : 'REQUESTS'}"
+                                             selectionChange=".onSectionSwitch">
+                                <items>
+                                    <SegmentedButtonItem key="REQUESTS" text="Requests" width="8rem"/>
+                                    <SegmentedButtonItem key="USERS"    text="User Management" width="10rem"/>
+                                </items>
+                            </SegmentedButton>
+                        </HBox>
+                    </VBox>
+
+                    <!-- ③ Module Tabs ───────────────────────────── -->
                     <IconTabBar id="moduleTabBar"
+                                visible="{= !${vm>/userMgmtMode}}"
                                 expandable="false"
                                 stretchContentHeight="false"
                                 select=".onTabSelect"
@@ -91,8 +103,8 @@
                         <content/>
                     </IconTabBar>
 
-                    <!-- ③ Filter Strip — Requests ───────────────── -->
-                    <VBox class="itadmin-filter-strip">
+                    <!-- ④ Filter Strip — Requests ───────────────── -->
+                    <VBox class="itadmin-filter-strip" visible="{= !${vm>/userMgmtMode}}">
                         <SearchField id="searchField"
                                      placeholder="Search by name, creator, key..."
                                      search=".onSearch"
@@ -127,8 +139,9 @@
                         </HBox>
                     </VBox>
 
-                    <!-- ④ Request List ──────────────────────────── -->
+                    <!-- ⑤ Request List ──────────────────────────── -->
                     <List id="requestList"
+                          visible="{= !${vm>/userMgmtMode}}"
                           noDataText="No requests found."
                           items="{vm>/requests}"
                           selectionChange=".onRequestListSelect"
@@ -186,6 +199,102 @@
                         </items>
                     </List>
 
+                    <!-- ⑥ User Management Panel — grouped user list ─── -->
+                    <VBox visible="{vm>/userMgmtMode}">
+                        <!-- Search + Refresh + Add User toolbar -->
+                        <Toolbar class="itadmin-usermgmt-toolbar">
+                            <SearchField id="userSearchField"
+                                         placeholder="Search user ID or name..."
+                                         search=".onUserSearch"
+                                         showSearchButton="false"/>
+                            <ToolbarSpacer/>
+                            <Button icon="sap-icon://refresh" type="Transparent"
+                                    tooltip="Refresh" press=".onUserMgmtRefresh"/>
+                            <Button text="Add User" icon="sap-icon://add-employee"
+                                    type="Emphasized" press=".onAddUser"/>
+                        </Toolbar>
+                        <!-- Filter strip: Module + Role -->
+                        <HBox class="itadmin-usermgmt-filter" alignItems="Center">
+                            <Label text="Module" class="sapUiTinyMarginEnd"/>
+                            <Select id="umFilterModule"
+                                    width="7rem"
+                                    change=".onUserFilterChange"
+                                    class="sapUiTinyMarginEnd">
+                                <items>
+                                    <core:Item key="" text="All"/>
+                                    <core:Item key="FI"   text="FI"/>
+                                    <core:Item key="MM"   text="MM"/>
+                                    <core:Item key="MMSS" text="MMSS"/>
+                                    <core:Item key="SD"   text="SD"/>
+                                    <core:Item key="ALL"  text="ALL"/>
+                                </items>
+                            </Select>
+                            <Label text="Role" class="sapUiTinyMarginEnd"/>
+                            <Select id="umFilterRole"
+                                    width="8.5rem"
+                                    change=".onUserFilterChange"
+                                    class="sapUiTinyMarginEnd">
+                                <items>
+                                    <core:Item key=""          text="All"/>
+                                    <core:Item key="KEY USER"  text="Key User"/>
+                                    <core:Item key="MANAGER"   text="Manager"/>
+                                    <core:Item key="IT ADMIN"  text="IT Admin"/>
+                                </items>
+                            </Select>
+                            <Button icon="sap-icon://clear-filter"
+                                    type="Transparent"
+                                    tooltip="Clear filters"
+                                    press=".onUserFilterClear"
+                                    visible="{= !!(${vm>/umFilter/module} || ${vm>/umFilter/role})}"/>
+                        </HBox>
+                        <!-- User list (grouped by UserId) -->
+                        <List id="userList"
+                              noDataText="No users found."
+                              items="{vm>/users}"
+                              selectionChange=".onUserListSelect"
+                              mode="SingleSelectMaster"
+                              growing="true" growingThreshold="50"
+                              showSeparators="Inner"
+                              class="itadmin-inbox-list">
+                            <items>
+                                <CustomListItem class="itadmin-inbox-item">
+                                    <VBox class="itadmin-item-body">
+                                        <!-- Row 1: User ID + Active badge -->
+                                        <HBox justifyContent="SpaceBetween" alignItems="Center">
+                                            <HBox alignItems="Center">
+                                                <core:Icon src="sap-icon://employee"
+                                                           color="#0070F2" size="0.875rem"
+                                                           class="sapUiTinyMarginEnd"/>
+                                                <Text text="{vm>userId}"
+                                                      class="itadmin-item-title"/>
+                                            </HBox>
+                                            <ObjectStatus
+                                                text="{= ${vm>isActive} ? 'Active' : 'Inactive'}"
+                                                state="{= ${vm>isActive} ? 'Success' : 'Error'}"
+                                                class="itadmin-item-env"/>
+                                        </HBox>
+                                        <!-- Row 2: Fullname -->
+                                        <Text text="{vm>fullname}"
+                                              class="itadmin-meta-txt"
+                                              visible="{= !!${vm>fullname}}"/>
+                                        <!-- Row 3: Role pills + module pills -->
+                                        <HBox alignItems="Center" wrap="Wrap"
+                                              class="itadmin-item-meta sapUiTinyMarginTop">
+                                            <ObjectStatus
+                                                text="{vm>primaryRole}"
+                                                state="{= ${vm>primaryRole} === 'IT ADMIN' ? 'Success' :
+                                                           ${vm>primaryRole} === 'MANAGER'  ? 'Warning' : 'Information'}"
+                                                inverted="true"
+                                                class="itadmin-mod-pill sapUiTinyMarginEnd"/>
+                                            <Text text="{vm>modulesSummary}"
+                                                  class="itadmin-item-key"/>
+                                        </HBox>
+                                    </VBox>
+                                </CustomListItem>
+                            </items>
+                        </List>
+                    </VBox>
+
                 </content>
             </Page>
         </f:beginColumnPages>
@@ -201,7 +310,7 @@
                 <content>
 
                     <!-- ═══ DEFAULT VIEW: Audit Trail (always shown unless a request is open) ═══ -->
-                    <VBox visible="{detail>/isAuditDefault}" class="itadmin-audit-panel">
+                    <VBox visible="{= ${detail>/isAuditDefault} &amp;&amp; !${vm>/userDetailMode}}" class="itadmin-audit-panel">
 
                         <!-- Audit header -->
                         <HBox alignItems="Center" justifyContent="SpaceBetween"
@@ -321,11 +430,131 @@
                         </List>
 
                     </VBox>
+                    <!-- ═══ USER DETAIL PANEL (shown when a user is selected in User Management) ═══ -->
+                    <VBox visible="{vm>/userDetailMode}" class="itadmin-user-detail-panel">
+
+                        <!-- User Detail Header -->
+                        <HBox alignItems="Center" justifyContent="SpaceBetween"
+                              class="itadmin-detail-hdr">
+                            <HBox alignItems="Center">
+                                <Button icon="sap-icon://nav-back"
+                                        type="Transparent"
+                                        press=".onUserDetailBack"
+                                        class="itadmin-back-btn"/>
+                                <VBox class="itadmin-detail-hdr-content">
+                                    <Title text="{vm>/selectedUser/userId}"
+                                           level="H4" class="itadmin-detail-title"/>
+                                    <HBox alignItems="Center" class="itadmin-detail-subtitle">
+                                        <Text text="{vm>/selectedUser/fullname}"
+                                              class="itadmin-meta-txt"
+                                              visible="{= !!${vm>/selectedUser/fullname}}"/>
+                                    </HBox>
+                                </VBox>
+                            </HBox>
+                            <Button text="Deactivate All"
+                                    icon="sap-icon://locked"
+                                    type="Reject"
+                                    visible="{vm>/selectedUser/isActive}"
+                                    press=".onDeactivateAllRoles"/>
+                        </HBox>
+
+                        <!-- Roles Section -->
+                        <VBox class="itadmin-user-section">
+                            <HBox justifyContent="SpaceBetween" alignItems="Center"
+                                  class="itadmin-user-section-hdr">
+                                <HBox alignItems="Center">
+                                    <core:Icon src="sap-icon://role" color="#0070F2"
+                                               size="0.875rem" class="sapUiTinyMarginEnd"/>
+                                    <Title text="Roles" level="H5"/>
+                                </HBox>
+                                <Button text="Add" icon="sap-icon://add"
+                                        type="Emphasized" press=".onAddRole"/>
+                            </HBox>
+                            <List id="userRoleList"
+                                  noDataText="No roles assigned."
+                                  items="{vm>/selectedUser/roles}"
+                                  showSeparators="Inner"
+                                  class="itadmin-user-detail-list">
+                                <items>
+                                    <CustomListItem class="itadmin-user-role-item">
+                                        <HBox justifyContent="SpaceBetween" alignItems="Center"
+                                              class="itadmin-user-role-row">
+                                            <HBox alignItems="Center" wrap="Wrap">
+                                                <ObjectStatus text="{vm>ModuleId}"
+                                                    state="Information" inverted="true"
+                                                    class="itadmin-mod-pill sapUiSmallMarginEnd"/>
+                                                <ObjectStatus text="{vm>RoleLevel}"
+                                                    state="{= ${vm>RoleLevel} === 'IT ADMIN' ? 'Success' :
+                                                               ${vm>RoleLevel} === 'MANAGER'  ? 'Warning' : 'Information'}"
+                                                    inverted="true"
+                                                    class="itadmin-mod-pill"/>
+                                                <Text text="{= 'Org: ' + ${vm>OrgAccess}}"
+                                                      visible="{= !!(${vm>OrgAccess} &amp;&amp; ${vm>OrgAccess} !== '*')}"
+                                                      class="itadmin-item-key sapUiTinyMarginBegin"/>
+                                            </HBox>
+                                            <HBox alignItems="Center">
+                                                <Switch state="{vm>IsActive}"
+                                                        customTextOn="On" customTextOff="Off"
+                                                        change=".onToggleRoleActive"/>
+                                                <Button icon="sap-icon://delete"
+                                                        type="Transparent"
+                                                        press=".onDeleteRole"
+                                                        class="sapUiTinyMarginBegin"/>
+                                            </HBox>
+                                        </HBox>
+                                    </CustomListItem>
+                                </items>
+                            </List>
+                        </VBox>
+
+                        <!-- Emails Section -->
+                        <VBox class="itadmin-user-section">
+                            <HBox justifyContent="SpaceBetween" alignItems="Center"
+                                  class="itadmin-user-section-hdr">
+                                <HBox alignItems="Center">
+                                    <core:Icon src="sap-icon://email" color="#0070F2"
+                                               size="0.875rem" class="sapUiTinyMarginEnd"/>
+                                    <Title text="Emails" level="H5"/>
+                                </HBox>
+                                <Button text="Add" icon="sap-icon://add"
+                                        type="Emphasized" press=".onAddMail"/>
+                            </HBox>
+                            <List id="userMailList"
+                                  noDataText="No emails assigned."
+                                  items="{vm>/selectedUser/mails}"
+                                  showSeparators="Inner"
+                                  class="itadmin-user-detail-list">
+                                <items>
+                                    <CustomListItem class="itadmin-user-role-item">
+                                        <HBox justifyContent="SpaceBetween" alignItems="Center"
+                                              class="itadmin-user-role-row">
+                                            <HBox alignItems="Center">
+                                                <core:Icon src="sap-icon://email"
+                                                           color="#89919A" size="0.8rem"
+                                                           class="sapUiTinyMarginEnd"/>
+                                                <Text text="{vm>Email}" class="itadmin-meta-txt"/>
+                                            </HBox>
+                                            <HBox alignItems="Center">
+                                                <Button icon="sap-icon://edit"
+                                                        type="Transparent"
+                                                        tooltip="Edit email"
+                                                        press=".onEditMail"/>
+                                                <Button icon="sap-icon://delete"
+                                                        type="Transparent"
+                                                        press=".onDeleteMail"/>
+                                            </HBox>
+                                        </HBox>
+                                    </CustomListItem>
+                                </items>
+                            </List>
+                        </VBox>
+
+                    </VBox>
                     <!-- ═══════════════════════════════════════════════════════════ -->
 
                     <!-- ① Sticky Detail Header ──────────────────── -->
                     <HBox alignItems="Center" class="itadmin-detail-hdr"
-                          visible="{= !${detail>/isAuditDefault}}">
+                          visible="{= !${detail>/isAuditDefault} &amp;&amp; !${vm>/userDetailMode}}">
                         <Button icon="sap-icon://nav-back"
                                 type="Transparent"
                                 press=".onDetailBack"
@@ -367,7 +596,7 @@
                                 select=".onDetailTabSelect"
                                 expandable="false"
                                 stretchContentHeight="false"
-                                visible="{= !${detail>/isAuditDefault}}"
+                                visible="{= !${detail>/isAuditDefault} &amp;&amp; !${vm>/userDetailMode}}"
                                 class="itadmin-detail-tabs">
                         <items>
 
@@ -405,7 +634,7 @@
                 <!-- Footer: action buttons (hidden when showing Audit Trail default) -->
                 <footer>
                     <OverflowToolbar class="itadmin-action-footer"
-                                     visible="{= !${detail>/isAuditDefault}}">
+                                     visible="{= !${detail>/isAuditDefault} &amp;&amp; !${vm>/userDetailMode}}">
                         <Button id="detailPromoteBtn"
                                 text="{= 'Promote → ' + ${detail>/nextEnv}}"
                                 icon="sap-icon://journey-arrive"

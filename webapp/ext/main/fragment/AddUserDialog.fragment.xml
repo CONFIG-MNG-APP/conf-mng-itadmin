@@ -1,0 +1,64 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form">
+    
+    <Dialog
+        title="{userForm>/title}"
+        contentWidth="28rem">
+        
+        <content>
+            <f:SimpleForm
+                editable="true"
+                layout="ResponsiveGridLayout"
+                labelSpanXL="4" labelSpanL="4" labelSpanM="4" labelSpanS="12"
+                emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0"
+                columnsXL="1" columnsL="1" columnsM="1">
+                
+                <f:content>
+                    <Label text="User ID" required="true"/>
+                    <Input
+                        value="{userForm>/UserId}"
+                        placeholder="Enter user ID"/>
+                    
+                    <Label text="Module" required="true"/>
+                    <Select selectedKey="{userForm>/ModuleId}">
+                        <items>
+                            <core:Item key="MM" text="MM Route"/>
+                            <core:Item key="MMSS" text="MM Safe Stock"/>
+                            <core:Item key="FI" text="FI Limit"/>
+                            <core:Item key="SD" text="SD Price"/>
+                        </items>
+                    </Select>
+                    
+                    <Label text="Role Level" required="true"/>
+                    <Select selectedKey="{userForm>/RoleLevel}">
+                        <items>
+                            <core:Item key="KEY USER" text="KEY USER"/>
+                            <core:Item key="MANAGER" text="MANAGER"/>
+                            <core:Item key="IT ADMIN" text="IT ADMIN"/>
+                        </items>
+                    </Select>
+                    
+                    <Label text="Org Access"/>
+                    <Input value="{userForm>/OrgAccess}" placeholder="e.g. *, 1000, 2000"/>
+                    
+                    <Label text="Active"/>
+                    <Switch state="{userForm>/IsActive}"/>
+                    
+                    <Label text="Email (Optional)"/>
+                    <Input
+                        value="{userForm>/Email}"
+                        type="Email"
+                        placeholder="user@example.com"/>
+                </f:content>
+            </f:SimpleForm>
+        </content>
+        
+        <buttons>
+            <Button text="Cancel" press=".onCancelAddUser"/>
+            <Button text="Save" type="Emphasized" press=".onSaveNewUser"/>
+        </buttons>
+    </Dialog>
+    
+</core:FragmentDefinition>

@@ -1,0 +1,62 @@
+<core:FragmentDefinition
+    xmlns:core="sap.ui.core"
+    xmlns="sap.m"
+    xmlns:l="sap.ui.layout.form">
+
+    <Dialog title="{roleDialog>/title}" contentWidth="28rem" resizable="true">
+        <content>
+            <l:SimpleForm
+                editable="true"
+                layout="ResponsiveGridLayout"
+                labelSpanXL="4" labelSpanL="4" labelSpanM="4"
+                emptySpanXL="0" emptySpanL="0" emptySpanM="0"
+                class="sapUiSmallMargin">
+
+                <l:content>
+                    <Label text="User ID" required="true"/>
+                    <Input value="{roleDialog>/UserId}"
+                           enabled="{roleDialog>/isNew}"
+                           placeholder="e.g. JDOE"
+                           maxLength="12"/>
+
+                    <Label text="Module" required="true"/>
+                    <Select selectedKey="{roleDialog>/ModuleId}"
+                            enabled="{roleDialog>/isNew}">
+                        <items>
+                            <core:Item key="FI"   text="FI"/>
+                            <core:Item key="MM"   text="MM"/>
+                            <core:Item key="MMSS" text="MMSS"/>
+                            <core:Item key="SD"   text="SD"/>
+                            <core:Item key="ALL"  text="ALL"/>
+                        </items>
+                    </Select>
+
+                    <Label text="Role Level" required="true"/>
+                    <Select selectedKey="{roleDialog>/RoleLevel}">
+                        <items>
+                            <core:Item key="KEY USER" text="Key User"/>
+                            <core:Item key="MANAGER"  text="Manager"/>
+                            <core:Item key="IT ADMIN" text="IT Admin"/>
+                        </items>
+                    </Select>
+
+                    <Label text="Org Access"/>
+                    <Input value="{roleDialog>/OrgAccess}"
+                           placeholder="* for all orgs"
+                           maxLength="20"/>
+
+                    <Label text="Active"/>
+                    <Switch state="{roleDialog>/IsActive}"
+                            customTextOn="Yes" customTextOff="No"/>
+                </l:content>
+            </l:SimpleForm>
+        </content>
+        <beginButton>
+            <Button text="Save" type="Emphasized" press=".onSaveRole"/>
+        </beginButton>
+        <endButton>
+            <Button text="Cancel" press=".onRoleDialogClose"/>
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

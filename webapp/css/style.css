@@ -90,13 +90,31 @@
 
 
 /* ───────────────────────────────────────────────────────────────────
+   2b. MASTER HEADER — 3-column layout (title | nav | actions)
+   ─────────────────────────────────────────────────────────────────── */
+
+.itadmin-hdr-left {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.itadmin-hdr-center {
+    flex: 0 0 auto;
+    padding: 0 0.75rem;
+}
+
+.itadmin-hdr-right {
+    flex: 1 1 0;
+    justify-content: flex-end;
+}
+
+/* ───────────────────────────────────────────────────────────────────
    3. MODULE TABS
    ─────────────────────────────────────────────────────────────────── */
 
 .itadmin-module-tabs.sapMITB {
     background: #FFFFFF !important;
     border-bottom: 1px solid #D9DCE0 !important;
-    /* Sticky just below the master header (~3.25rem tall) */
     position: sticky !important;
     top: 3.25rem !important;
     z-index: 9 !important;
@@ -679,4 +697,136 @@
     color: #0a6ed1 !important;
     font-size: 0.75rem !important;
     font-style: italic;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   20. USER MANAGEMENT PANEL — tab bar + tables
+   ─────────────────────────────────────────────────────────────────── */
+
+/* Tab bar — sticky below master header; NOT itadmin-module-tabs
+   (that class hides content via height:0) */
+.itadmin-usermgmt-tabs.sapMITB {
+    background: #FFFFFF !important;
+    border-bottom: 1px solid #D9DCE0 !important;
+    position: sticky !important;
+    top: 3.25rem !important;
+    z-index: 9 !important;
+}
+
+.itadmin-usermgmt-tabs .sapMITBHead {
+    background: #FFFFFF !important;
+}
+
+.itadmin-usermgmt-tabs .sapMITBContentArrow {
+    display: none !important;
+}
+
+/* Tab content — visible (unlike module tabs which set height:0) */
+.itadmin-usermgmt-tabs .sapMITBContainerDiv,
+.itadmin-usermgmt-tabs .sapMITBContent {
+    padding: 0 !important;
+    background: #FFFFFF !important;
+}
+
+/* Table header toolbar (search + refresh + add button) */
+.itadmin-usermgmt-toolbar.sapMTB {
+    background: #F7F7F7 !important;
+    border-bottom: 1px solid #E8E8E8 !important;
+    padding: 0.375rem 0.75rem !important;
+    min-height: 2.75rem !important;
+    box-sizing: border-box !important;
+}
+
+/* Table itself */
+.itadmin-usermgmt-table.sapMTable {
+    border: none !important;
+    box-shadow: none !important;
+    background: #FFFFFF !important;
+}
+
+.itadmin-usermgmt-table .sapMListTblHeaderCell {
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    color: #6A6D70 !important;
+    background: #FAFAFA !important;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────
+   21. USER DETAIL PANEL — right panel when a user is selected
+   ─────────────────────────────────────────────────────────────────── */
+
+/* Section container (Roles / Emails) */
+.itadmin-user-section {
+    background: #FFFFFF;
+    border: 1px solid #E8E8E8;
+    border-radius: 8px;
+    margin: 0.75rem 1rem;
+    overflow: hidden;
+}
+
+/* Section header toolbar */
+.itadmin-user-section-hdr {
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid #E8E8E8;
+    background: #FAFAFA;
+}
+
+/* List inside section */
+.itadmin-user-detail-list.sapMList {
+    background: #FFFFFF !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.itadmin-user-detail-list .sapMListUl {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Each role/email row */
+.itadmin-user-role-item.sapMLIB {
+    background: #FFFFFF !important;
+    border-left: 3px solid transparent !important;
+    cursor: default !important;
+}
+
+.itadmin-user-role-item.sapMLIB:hover {
+    background: #F5F6F7 !important;
+}
+
+.itadmin-user-role-row {
+    padding: 0.625rem 1rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.itadmin-user-role-item .sapMLIBContent {
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+/* ── Section 22: User Management Filter Strip ── */
+.itadmin-usermgmt-filter {
+    padding: 0.375rem 1rem;
+    background: #F7F7F7;
+    border-bottom: 1px solid #E5E5E5;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.itadmin-usermgmt-filter .sapMLabel {
+    font-size: 0.75rem;
+    color: #6A6D70;
+    white-space: nowrap;
+}
+
+.itadmin-usermgmt-filter .sapMSelect {
+    min-width: 0;
+}
+
+.itadmin-usermgmt-filter .sapMSelectHiddenSelect {
+    min-width: 0;
 }

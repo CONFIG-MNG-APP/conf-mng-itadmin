@@ -15,6 +15,7 @@ sap.ui.define(
     const _AUDIT_URL   = "/sap/opu/odata4/sap/zui_audit_log/srvd/sap/zsd_audit_log/0001/AuditLog";
     const _FETCH_HDR   = { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" };
     const _ENV_ORDER   = { DEV: 1, QAS: 2, PRD: 3 };
+    const _UM_URL      = "/sap/opu/odata4/sap/zui_user_mgmt/srvd/sap/zsd_user_mgmt/0001/";
 
     function _getSapClient() {
       try {
@@ -141,7 +142,7 @@ sap.ui.define(
           "kpi"
         );
         this.getView().setModel(
-          new JSONModel({ requests: [], auditEntries: [], auditDisplay: [] }),
+          new JSONModel({ requests: [], auditEntries: [], auditDisplay: [], userMgmtMode: false, roles: [], mails: [], users: [], selectedUser: null, userDetailMode: false, umFilter: { module: "", role: "" } }),
           "vm"
         );
         // Notification model — managed by NotificationService (APPROVED-only polling)
@@ -1009,38 +1010,6 @@ sap.ui.define(
         }
       },
 
-      // ─── Email notification (fire-and-forget) ────────────────────────────────
-      // Sends notification to external mail-service on Render.com.
-      // Failures are silently ignored and do NOT affect app logic.
-
-      _MAIL_SERVICE_URL: "https://abap19-mail-206.onrender.com/api/notify",
-      _MAIL_SERVICE_KEY: "abap19-mail-secret-key-change-me",
-
-      _sendMailNotification: function (oPayload) {
-        try {
-          fetch(this._MAIL_SERVICE_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": this._MAIL_SERVICE_KEY
-            },
-            body: JSON.stringify(oPayload || {})
-          }).catch(function () { /* silently ignore */ });
-        } catch (e) { /* silently ignore */ }
-      },
-
-      _getCurrentUser: function () {
-        try {
-          if (sap && sap.ushell && sap.ushell.Container) {
-            var oService = sap.ushell.Container.getService("UserInfo");
-            if (oService && oService.getUser) {
-              return oService.getUser().getId() || "unknown";
-            }
-          }
-        } catch (e) { /* ignore */ }
-        return "unknown";
-      },
-
       // ─── Rollback order validation ────────────────────────────────────────────
 
       _checkRollbackOrder: async function (sReqId, sCurrentEnv) {
@@ -1403,14 +1372,6 @@ sap.ui.define(
                 oView.setBusy(true);
                 try {
                   await this._execBoundAction(sReqId, sEnvId, "rollback");
-                  this._sendMailNotification({
-                    event: "ROLLED_BACK",
-                    reqId: sReqId,
-                    reqTitle: (this._oCurrentItem && this._oCurrentItem.ReqTitle) || sReqId,
-                    module:   (this._oCurrentItem && this._oCurrentItem.ModuleId) || "",
-                    envId:    sEnvId,
-                    triggeredBy: this._getCurrentUser(),
-                  });
                   this._aCachedAll = null;
                   this._loadRequests();
                   this._loadAuditTrail();
@@ -1466,17 +1427,6 @@ sap.ui.define(
               oView.setBusy(true);
               try {
                 await this._execBoundAction(sReqId, sEnvId, "rollback");
-
-                // === Email notification (fire-and-forget) ===
-                this._sendMailNotification({
-                  event: "ROLLED_BACK",
-                  reqId: sReqId,
-                  reqTitle: oItem.ReqTitle || sReqId,
-                  module: oItem.ModuleId || "",
-                  envId: sEnvId,
-                  triggeredBy: this._getCurrentUser()
-                });
-
                 this._aCachedAll = null;
                 this._loadRequests();
                 // Reload audit trail để hiện snapshot rollback mới ngay lập tức
@@ -1521,17 +1471,6 @@ sap.ui.define(
               oView.setBusy(true);
               try {
                 await this._execBoundAction(oItem.ReqId, sCurEnv, "promote");
-
-                // === Email notification (fire-and-forget) ===
-                this._sendMailNotification({
-                  event: "PROMOTED",
-                  reqId: oItem.ReqId,
-                  reqTitle: sTitle,
-                  module: oItem.ModuleId || "",
-                  envId: sNextEnv,
-                  triggeredBy: this._getCurrentUser()
-                });
-
                 this._aCachedAll = null;
                 this._loadRequests();
                 // Reload audit trail để hiện snapshot mới ngay lập tức
@@ -1767,6 +1706,541 @@ sap.ui.define(
 
       onEnvCompareClose: function () {
         if (this._oEnvCompareDialog) { this._oEnvCompareDialog.close(); }
+      },
+
+      // ─── User Management ──────────────────────────────────────────────────────
+
+      _getUmCsrfToken: async function () {
+        try {
+          const oResp = await fetch(_UM_URL, {
+            method: "HEAD",
+            headers: Object.assign({}, _FETCH_HDR, { "X-CSRF-Token": "Fetch" }),
+          });
+          return oResp.headers.get("x-csrf-token") || oResp.headers.get("X-CSRF-Token") || "";
+        } catch (e) { return ""; }
+      },
+
+      onSectionSwitch: async function (oEvent) {
+        const sKey   = oEvent.getParameter("item").getKey();
+        const bUsers = sKey === "USERS";
+        const oVm    = this.getView().getModel("vm");
+        oVm.setProperty("/userMgmtMode", bUsers);
+        oVm.setProperty("/userDetailMode", false);
+        if (bUsers) {
+          await Promise.all([this._loadUserRoles(), this._loadUserMails()]);
+        }
+      },
+
+      onUserMgmtRefresh: async function () {
+        await Promise.all([this._loadUserRoles(), this._loadUserMails()]);
+        this._buildUserList();
+      },
+
+      onAddUser: async function () {
+        const oModel = new JSONModel({
+          title:     "Add New User",
+          UserId:    "",
+          ModuleId:  "FI",
+          RoleLevel: "KEY USER",
+          OrgAccess: "*",
+          IsActive:  true,
+          isNew:     true,
+        });
+        if (!this._oRoleDialog) {
+          this._oRoleDialog = await Fragment.load({
+            id:         this.getView().getId(),
+            name:       "zgsp26.conf.mng.itadmin.ext.main.fragment.UserRoleDialog",
+            controller: this,
+          });
+          this.getView().addDependent(this._oRoleDialog);
+        }
+        this._oRoleDialog.setModel(oModel, "roleDialog");
+        this._oRoleDialog.open();
+      },
+
+      _loadUserRoles: async function () {
+        try {
+          const oResp = await fetch(
+            _UM_URL + "UserRole?$top=500&$select=UserId,ModuleId,RoleLevel,Fullname,IsActive,OrgAccess&$orderby=UserId,ModuleId",
+            { headers: _FETCH_HDR }
+          );
+          if (!oResp.ok) throw new Error("HTTP " + oResp.status);
+          this._aRolesAll = (await oResp.json()).value || [];
+          this._buildUserList();
+        } catch (e) {
+          MessageToast.show("Failed to load user roles: " + e.message);
+        }
+      },
+
+      _loadUserMails: async function () {
+        try {
+          const oResp = await fetch(
+            _UM_URL + "UserMail?$top=500&$select=UserId,Email&$orderby=UserId",
+            { headers: _FETCH_HDR }
+          );
+          if (!oResp.ok) throw new Error("HTTP " + oResp.status);
+          this._aMailsAll = (await oResp.json()).value || [];
+          this._buildUserList();
+        } catch (e) {
+          MessageToast.show("Failed to load user emails: " + e.message);
+        }
+      },
+
+      // Group roles + mails by UserId → build vm>/users list
+      _buildUserList: function () {
+        const aRolesAll = this._aRolesAll || [];
+        const aMails    = this._aMailsAll || [];
+        const oVm       = this.getView().getModel("vm");
+        const oFilter   = oVm.getProperty("/umFilter") || {};
+        const sModF     = oFilter.module || "";
+        const sRoleF    = oFilter.role   || "";
+
+        // Pre-filter roles by module/role before grouping
+        const aRoles = aRolesAll.filter(function (r) {
+          if (sModF  && r.ModuleId  !== sModF)  return false;
+          if (sRoleF && r.RoleLevel !== sRoleF)  return false;
+          return true;
+        });
+
+        // Group roles by UserId
+        const oMap = {};
+        aRoles.forEach(function (r) {
+          if (!oMap[r.UserId]) {
+            oMap[r.UserId] = {
+              userId:         r.UserId,
+              fullname:       r.Fullname || "",
+              primaryRole:    r.RoleLevel,
+              isActive:       !!r.IsActive,
+              roles:          [],
+              mails:          [],
+              modulesSummary: "",
+            };
+          }
+          oMap[r.UserId].roles.push(r);
+          if (r.IsActive) oMap[r.UserId].isActive = true;
+        });
+
+        // Attach mails
+        aMails.forEach(function (m) {
+          if (oMap[m.UserId]) {
+            oMap[m.UserId].mails.push(m);
+          }
+        });
+
+        // Build modules summary string
+        Object.values(oMap).forEach(function (u) {
+          const aMods = u.roles.map(function (r) { return r.ModuleId; });
+          u.modulesSummary = aMods.join(" · ");
+        });
+
+        let aUsers = Object.values(oMap).sort(function (a, b) {
+          return a.userId.localeCompare(b.userId);
+        });
+
+        // Apply text search
+        const sQ = (this._sUserQuery || "").toLowerCase();
+        if (sQ) {
+          aUsers = aUsers.filter(function (u) {
+            return u.userId.toLowerCase().includes(sQ) ||
+                   (u.fullname || "").toLowerCase().includes(sQ);
+          });
+        }
+
+        oVm.setProperty("/users", aUsers);
+      },
+
+      onUserSearch: function (oEvent) {
+        this._sUserQuery = oEvent.getParameter("query") || "";
+        this._buildUserList();
+      },
+
+      onUserFilterChange: function () {
+        const oVm  = this.getView().getModel("vm");
+        const sMod = this.byId("umFilterModule") ? this.byId("umFilterModule").getSelectedKey() : "";
+        const sRol = this.byId("umFilterRole")   ? this.byId("umFilterRole").getSelectedKey()   : "";
+        oVm.setProperty("/umFilter/module", sMod);
+        oVm.setProperty("/umFilter/role",   sRol);
+        this._buildUserList();
+      },
+
+      onUserFilterClear: function () {
+        const oVm = this.getView().getModel("vm");
+        oVm.setProperty("/umFilter", { module: "", role: "" });
+        const oModSel = this.byId("umFilterModule");
+        const oRolSel = this.byId("umFilterRole");
+        const oSearch = this.byId("userSearchField");
+        if (oModSel) oModSel.setSelectedKey("");
+        if (oRolSel) oRolSel.setSelectedKey("");
+        if (oSearch) oSearch.setValue("");
+        this._sUserQuery = "";
+        this._buildUserList();
+      },
+
+      // Click on a user in the list → show detail in right panel
+      onUserListSelect: function (oEvent) {
+        if (oEvent.getParameter("selected") === false) return;
+        const oCtx  = oEvent.getParameter("listItem").getBindingContext("vm");
+        if (!oCtx) return;
+        const oUser = oCtx.getObject();
+        const oVm   = this.getView().getModel("vm");
+        oVm.setProperty("/selectedUser", JSON.parse(JSON.stringify(oUser)));
+        oVm.setProperty("/userDetailMode", true);
+        oVm.setProperty("/isAuditDefault", false);
+        this.getView().getModel("detail").setProperty("/isAuditDefault", false);
+        this.getView().getModel("fcl").setProperty("/layout", "TwoColumnsMidExpanded");
+      },
+
+      onUserDetailBack: function () {
+        const oVm = this.getView().getModel("vm");
+        oVm.setProperty("/userDetailMode", false);
+        oVm.setProperty("/selectedUser", null);
+        this.getView().getModel("detail").setProperty("/isAuditDefault", true);
+        const oList = this.byId("userList");
+        if (oList) oList.removeSelections(true);
+      },
+
+      // Deactivate ALL roles for the selected user
+      onDeactivateAllRoles: async function () {
+        const oVm   = this.getView().getModel("vm");
+        const oUser = oVm.getProperty("/selectedUser");
+        if (!oUser) return;
+
+        MessageBox.confirm(
+          "Deactivate all roles for user '" + oUser.userId + "'?\nThis will set IsActive = false for all their roles.",
+          {
+            onClose: async (sAction) => {
+              if (sAction !== MessageBox.Action.OK) return;
+              const sToken = await this._getUmCsrfToken();
+              const aRoles = oUser.roles || [];
+              try {
+                await Promise.all(aRoles.map(async (r) => {
+                  const sKey = "UserRole(UserId='" + r.UserId + "',ModuleId='" + r.ModuleId + "')";
+                  await fetch(_UM_URL + sKey, {
+                    method: "PATCH",
+                    headers: Object.assign({}, _FETCH_HDR, {
+                      "Content-Type": "application/json",
+                      "X-CSRF-Token": sToken,
+                    }),
+                    body: JSON.stringify({ IsActive: false }),
+                  });
+                }));
+                MessageToast.show("All roles deactivated for " + oUser.userId + ".");
+                await Promise.all([this._loadUserRoles(), this._loadUserMails()]);
+                // Refresh selected user data
+                const aUpdated = (this.getView().getModel("vm").getProperty("/users") || [])
+                  .find(function (u) { return u.userId === oUser.userId; });
+                if (aUpdated) {
+                  oVm.setProperty("/selectedUser", JSON.parse(JSON.stringify(aUpdated)));
+                }
+              } catch (e) {
+                MessageBox.error("Deactivate failed: " + e.message);
+              }
+            },
+          }
+        );
+      },
+
+      // Toggle IsActive for a single role
+      onToggleRoleActive: async function (oEvent) {
+        const bNewState = oEvent.getParameter("state");
+        const oCtx  = oEvent.getSource().getBindingContext("vm");
+        const oRole = oCtx.getObject();
+        const sToken = await this._getUmCsrfToken();
+        const sKey   = "UserRole(UserId='" + oRole.UserId + "',ModuleId='" + oRole.ModuleId + "')";
+        try {
+          const oResp = await fetch(_UM_URL + sKey, {
+            method: "PATCH",
+            headers: Object.assign({}, _FETCH_HDR, {
+              "Content-Type": "application/json",
+              "X-CSRF-Token": sToken,
+            }),
+            body: JSON.stringify({ IsActive: bNewState }),
+          });
+          if (!oResp.ok && oResp.status !== 204) {
+            MessageBox.error("Update failed: " + oResp.status);
+            // Revert switch
+            oEvent.getSource().setState(!bNewState);
+            return;
+          }
+          MessageToast.show(bNewState ? "Role activated." : "Role deactivated.");
+          await this._loadUserRoles();
+          // Refresh selected user
+          const oVm   = this.getView().getModel("vm");
+          const sUid  = oRole.UserId;
+          const oUpdated = (oVm.getProperty("/users") || []).find(function (u) { return u.userId === sUid; });
+          if (oUpdated) oVm.setProperty("/selectedUser", JSON.parse(JSON.stringify(oUpdated)));
+        } catch (e) {
+          MessageBox.error("Network error: " + e.message);
+        }
+      },
+
+      onRoleSearch: function (oEvent) {
+        const sQuery = (oEvent.getParameter("query") || "").toLowerCase();
+        const aFiltered = (this._aRolesAll || []).filter(function (r) {
+          return !sQuery ||
+            (r.UserId   || "").toLowerCase().includes(sQuery) ||
+            (r.ModuleId || "").toLowerCase().includes(sQuery) ||
+            (r.Fullname || "").toLowerCase().includes(sQuery);
+        });
+        this.getView().getModel("vm").setProperty("/roles", aFiltered);
+      },
+
+      onMailSearch: function (oEvent) {
+        const sQuery = (oEvent.getParameter("query") || "").toLowerCase();
+        const aFiltered = (this._aMailsAll || []).filter(function (m) {
+          return !sQuery ||
+            (m.UserId || "").toLowerCase().includes(sQuery) ||
+            (m.Email  || "").toLowerCase().includes(sQuery);
+        });
+        this.getView().getModel("vm").setProperty("/mails", aFiltered);
+      },
+
+      // ─── Role CRUD ────────────────────────────────────────────────────────────
+
+      onAddRole: async function () {
+        const oVm     = this.getView().getModel("vm");
+        const oUser   = oVm.getProperty("/selectedUser");
+        const oModel  = new JSONModel({
+          title: "Add Role" + (oUser ? " for " + oUser.userId : ""),
+          UserId:    oUser ? oUser.userId : "",
+          ModuleId:  "FI",
+          RoleLevel: "KEY USER",
+          OrgAccess: "*",
+          IsActive:  true,
+        });
+        if (!this._oRoleDialog) {
+          this._oRoleDialog = await Fragment.load({
+            id:         this.getView().getId(),
+            name:       "zgsp26.conf.mng.itadmin.ext.main.fragment.UserRoleDialog",
+            controller: this,
+          });
+          this.getView().addDependent(this._oRoleDialog);
+        }
+        this._oRoleDialog.setModel(oModel, "roleDialog");
+        this._oRoleDialog.open();
+      },
+
+      onSaveRole: async function () {
+        const oModel = this._oRoleDialog.getModel("roleDialog");
+        const oData  = oModel.getData();
+        if (!oData.UserId || !oData.ModuleId || !oData.RoleLevel) {
+          MessageToast.show("User ID, Module and Role Level are required.");
+          return;
+        }
+        const sToken = await this._getUmCsrfToken();
+        try {
+          const oResp = await fetch(_UM_URL + "UserRole", {
+            method: "POST",
+            headers: Object.assign({}, _FETCH_HDR, {
+              "Content-Type": "application/json",
+              "X-CSRF-Token": sToken,
+            }),
+            body: JSON.stringify({
+              UserId:    oData.UserId.toUpperCase(),
+              ModuleId:  oData.ModuleId,
+              RoleLevel: oData.RoleLevel,
+              OrgAccess: oData.OrgAccess || "*",
+              IsActive:  oData.IsActive,
+            }),
+          });
+          if (!oResp.ok) {
+            const oErr = await oResp.json().catch(function () { return {}; });
+            MessageBox.error((oErr.error && oErr.error.message) || "Save failed: " + oResp.status);
+            return;
+          }
+          MessageToast.show("Role saved.");
+          this._oRoleDialog.close();
+          await this._loadUserRoles();
+          // Refresh selected user if in user detail mode
+          const oVm = this.getView().getModel("vm");
+          const sUid = oData.UserId.toUpperCase();
+          const oUpdated = (oVm.getProperty("/users") || []).find(function (u) { return u.userId === sUid; });
+          if (oUpdated) oVm.setProperty("/selectedUser", JSON.parse(JSON.stringify(oUpdated)));
+        } catch (e) {
+          MessageBox.error("Network error: " + e.message);
+        }
+      },
+
+      onDeleteRole: function (oEvent) {
+        const oCtx  = oEvent.getSource().getBindingContext("vm");
+        const oRole = oCtx.getObject();
+        MessageBox.confirm(
+          "Remove role '" + oRole.RoleLevel + "' (" + oRole.ModuleId + ") for user '" + oRole.UserId + "'?",
+          {
+            onClose: async (sAction) => {
+              if (sAction !== MessageBox.Action.OK) return;
+              const sToken = await this._getUmCsrfToken();
+              const sKey   = "UserRole(UserId='" + oRole.UserId + "',ModuleId='" + oRole.ModuleId + "')";
+              try {
+                const oResp = await fetch(_UM_URL + sKey, {
+                  method: "DELETE",
+                  headers: Object.assign({}, _FETCH_HDR, { "X-CSRF-Token": sToken }),
+                });
+                if (!oResp.ok && oResp.status !== 204) {
+                  MessageBox.error("Delete failed: " + oResp.status);
+                  return;
+                }
+                MessageToast.show("Role removed.");
+                await this._loadUserRoles();
+                // Refresh selected user
+                const oVm = this.getView().getModel("vm");
+                const oUpdated = (oVm.getProperty("/users") || []).find(function (u) { return u.userId === oRole.UserId; });
+                if (oUpdated) {
+                  oVm.setProperty("/selectedUser", JSON.parse(JSON.stringify(oUpdated)));
+                } else {
+                  // No more roles → go back to list
+                  this.onUserDetailBack();
+                }
+              } catch (e) {
+                MessageBox.error("Network error: " + e.message);
+              }
+            },
+          }
+        );
+      },
+
+      onRoleDialogClose: function () {
+        this._oRoleDialog.close();
+      },
+
+      // ─── Mail CRUD ────────────────────────────────────────────────────────────
+
+      onAddMail: async function () {
+        const oVm   = this.getView().getModel("vm");
+        const oUser = oVm.getProperty("/selectedUser");
+        const oModel = new JSONModel({
+          title:  "Add Email" + (oUser ? " for " + oUser.userId : ""),
+          UserId: oUser ? oUser.userId : "",
+          Email:  "",
+          isNew:  false,  // UserId pre-filled, không cần edit
+          isEdit: false,  // → POST
+        });
+        if (!this._oMailDialog) {
+          this._oMailDialog = await Fragment.load({
+            id:         this.getView().getId(),
+            name:       "zgsp26.conf.mng.itadmin.ext.main.fragment.UserMailDialog",
+            controller: this,
+          });
+          this.getView().addDependent(this._oMailDialog);
+        }
+        this._oMailDialog.setModel(oModel, "mailDialog");
+        this._oMailDialog.open();
+      },
+
+      onEditMail: async function (oEvent) {
+        const oCtx  = oEvent.getSource().getBindingContext("vm");
+        const oMail = oCtx.getObject();
+        const oModel = new JSONModel({
+          title:  "Edit Email for " + oMail.UserId,
+          UserId: oMail.UserId,
+          Email:  oMail.Email,
+          isNew:  false,  // UserId disabled
+          isEdit: true,   // → PATCH
+        });
+        if (!this._oMailDialog) {
+          this._oMailDialog = await Fragment.load({
+            id:         this.getView().getId(),
+            name:       "zgsp26.conf.mng.itadmin.ext.main.fragment.UserMailDialog",
+            controller: this,
+          });
+          this.getView().addDependent(this._oMailDialog);
+        }
+        this._oMailDialog.setModel(oModel, "mailDialog");
+        this._oMailDialog.open();
+      },
+
+      onSaveMail: async function () {
+        const oModel = this._oMailDialog.getModel("mailDialog");
+        const oData  = oModel.getData();
+        if (!oData.UserId || !oData.Email) {
+          MessageToast.show("User ID and Email are required.");
+          return;
+        }
+        if (!oData.Email.includes("@") || !oData.Email.includes(".")) {
+          MessageToast.show("Please enter a valid email address.");
+          return;
+        }
+        const sToken = await this._getUmCsrfToken();
+        try {
+          let oResp;
+          if (oData.isEdit) {
+            // PATCH — update existing email
+            const sKey = "UserMail(UserId='" + oData.UserId.toUpperCase() + "')";
+            oResp = await fetch(_UM_URL + sKey, {
+              method: "PATCH",
+              headers: Object.assign({}, _FETCH_HDR, {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": sToken,
+              }),
+              body: JSON.stringify({ Email: oData.Email }),
+            });
+          } else {
+            // POST — create new email
+            oResp = await fetch(_UM_URL + "UserMail", {
+              method: "POST",
+              headers: Object.assign({}, _FETCH_HDR, {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": sToken,
+              }),
+              body: JSON.stringify({
+                UserId: oData.UserId.toUpperCase(),
+                Email:  oData.Email,
+              }),
+            });
+          }
+          if (!oResp.ok) {
+            const oErr = await oResp.json().catch(function () { return {}; });
+            MessageBox.error((oErr.error && oErr.error.message) || "Save failed: " + oResp.status);
+            return;
+          }
+          MessageToast.show(oData.isEdit ? "Email updated." : "Email saved.");
+          this._oMailDialog.close();
+          await this._loadUserMails();
+          // Refresh selected user
+          const oVm  = this.getView().getModel("vm");
+          const sUid = oData.UserId.toUpperCase();
+          const oUpdated = (oVm.getProperty("/users") || []).find(function (u) { return u.userId === sUid; });
+          if (oUpdated) oVm.setProperty("/selectedUser", JSON.parse(JSON.stringify(oUpdated)));
+        } catch (e) {
+          MessageBox.error("Network error: " + e.message);
+        }
+      },
+
+      onDeleteMail: function (oEvent) {
+        const oCtx  = oEvent.getSource().getBindingContext("vm");
+        const oMail = oCtx.getObject();
+        MessageBox.confirm(
+          "Remove email '" + oMail.Email + "' for user '" + oMail.UserId + "'?",
+          {
+            onClose: async (sAction) => {
+              if (sAction !== MessageBox.Action.OK) return;
+              const sToken = await this._getUmCsrfToken();
+              // Key includes email to support multiple emails per user
+              const sKey = "UserMail(UserId='" + oMail.UserId + "',Email='" + encodeURIComponent(oMail.Email) + "')";
+              try {
+                const oResp = await fetch(_UM_URL + sKey, {
+                  method: "DELETE",
+                  headers: Object.assign({}, _FETCH_HDR, { "X-CSRF-Token": sToken }),
+                });
+                if (!oResp.ok && oResp.status !== 204) {
+                  MessageBox.error("Delete failed: " + oResp.status);
+                  return;
+                }
+                MessageToast.show("Email removed.");
+                await this._loadUserMails();
+                const oVm = this.getView().getModel("vm");
+                const oUpdated = (oVm.getProperty("/users") || []).find(function (u) { return u.userId === oMail.UserId; });
+                if (oUpdated) oVm.setProperty("/selectedUser", JSON.parse(JSON.stringify(oUpdated)));
+              } catch (e) {
+                MessageBox.error("Network error: " + e.message);
+              }
+            },
+          }
+        );
+      },
+
+      onMailDialogClose: function () {
+        this._oMailDialog.close();
       },
 
     });
